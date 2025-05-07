@@ -1,37 +1,117 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🚀 Examverse – Secure Quiz & Exam Platform by Agenoverse
 
-## Getting Started
+Examverse is a modern web-based exam and quiz platform focused on **security**, **monitoring**, and **scalability**. Developed by **Team Agenoverse**, it allows educators to create quizzes, monitor students via webcam/microphone, and securely evaluate responses — all in real time.
 
-First, run the development server:
+---
+
+## 🔧 Tech Stack
+
+- **Frontend**: Next.js + TypeScript
+- **Styling**: Tailwind CSS
+- **Database**: Firebase Firestore
+- **Auth**: Firebase Authentication
+- **Media Access**: WebRTC/MediaDevices API
+- **Hosting**: Vercel
+
+---
+
+## 🎯 Features
+
+- ✅ Create and manage multiple quizzes
+- ✅ Add MCQs with options and optional timers
+- ✅ User authentication (admin/student)
+- ✅ Enter quiz via access code
+- ✅ Real-time camera and mic access
+- ✅ Automatic answer checking and scoring
+- ✅ Show results when admin allows
+- ✅ Admin-only quiz and user management dashboard
+- ✅ Firebase-based data storage and security
+
+---
+
+## 📂 Folder Structure
+
+```
+
+/pages
+/admin ← Admin dashboard, quiz creation
+/quiz ← Join & attempt quiz
+/auth ← Login/Register
+
+/lib
+firebase.ts ← Firebase config
+auth.ts ← Auth functions
+camera.ts ← Media device logic
+
+/types
+quiz.ts ← Quiz & question types
+
+/components
+Question.tsx, Timer.tsx, QuizCard.tsx
+
+```
+
+---
+
+## 🚀 Getting Started
+
+### 1. Clone the Repo
+
+```bash
+git clone https://github.com/your-username/examverse.git
+cd examverse
+```
+
+### 2. Install Dependencies
+
+```bash
+npm install
+```
+
+### 3. Configure Firebase
+
+- Create a Firebase project
+- Enable Firestore and Auth
+- Add your credentials in `/lib/firebase.ts`
+
+```ts
+// lib/firebase.ts
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "...",
+  projectId: "...",
+  storageBucket: "...",
+  messagingSenderId: "...",
+  appId: "...",
+};
+```
+
+### 4. Run the App
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 👨‍💻 Team – Agenoverse
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Lead Developer (Admin Module)**: \[Your Name]
+- **Frontend Developer (Quiz Flow)**: \[Teammate 2]
+- **Security & Auth (Proctoring/Monitoring)**: \[Teammate 3]
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 📦 Deployment
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+This project can be deployed easily using [Vercel](https://vercel.com).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+vercel deploy
+```
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📜 License
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# Ageno-Quiz
+MIT License © 2025 Agenoverse
