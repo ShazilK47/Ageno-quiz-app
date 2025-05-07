@@ -1,4 +1,4 @@
-# 🚀 Examverse – Secure Quiz & Exam Platform by Agenoverse
+# 🚀 AgenoQuiz – Secure Quiz & Exam Platform by Agenoverse
 
 Examverse is a modern web-based exam and quiz platform focused on **security**, **monitoring**, and **scalability**. Developed by **Team Agenoverse**, it allows educators to create quizzes, monitor students via webcam/microphone, and securely evaluate responses — all in real time.
 
@@ -58,8 +58,8 @@ Question.tsx, Timer.tsx, QuizCard.tsx
 ### 1. Clone the Repo
 
 ```bash
-git clone https://github.com/your-username/examverse.git
-cd examverse
+git clone https://github.com/your-username/ageno-quiz.git
+cd ageno-quiz
 ```
 
 ### 2. Install Dependencies
