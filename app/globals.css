@@ -1,26 +1,237 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Base colors */
+  --purple-primary: #c37eff;
+  --cream-accent: #e7d0ff;
+  --tech-blue-dark: #1e293b; /* Adjusted for better readability */
+  --tech-blue-light: #3b82f6;
+  --white: #ffffff;
+  --dark: #171717;
+  --error: #ef4444;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --neutral-50: #f8fafc;
+  --neutral-100: #f1f5f9;
+  --neutral-200: #e2e8f0;
+  --neutral-300: #cbd5e1;
+
+  /* Light theme defaults */
+  --background: var(--white);
+  --foreground: var(--dark);
+  --accent-primary: var(--purple-primary);
+  --accent-secondary: var(--cream-accent);
+  --accent-tertiary: var(--tech-blue-light);
+  --muted: var(--neutral-200);
+  --muted-foreground: #64748b;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-accent-primary: var(--accent-primary);
+  --color-accent-secondary: var(--accent-secondary);
+  --color-accent-tertiary: var(--accent-tertiary);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: var(--tech-blue-dark);
+    --foreground: var(--white);
+    --accent-primary: var(--purple-primary);
+    --accent-secondary: var(--cream-accent);
+    --accent-tertiary: var(--tech-blue-light);
+    --muted: #334155;
+    --muted-foreground: #94a3b8;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans, Arial, Helvetica, sans-serif);
+  line-height: 1.6;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Professional UI elements */
+.btn-primary {
+  background-color: var(--accent-primary);
+  color: var(--white);
+  transition: all 0.2s ease;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-weight: 500;
+}
+
+.btn-primary:hover {
+  background-color: color-mix(in srgb, var(--accent-primary) 85%, black);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background-color: var(--accent-secondary);
+  color: var(--dark);
+  transition: all 0.2s ease;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-weight: 500;
+}
+
+.btn-secondary:hover {
+  background-color: color-mix(in srgb, var(--accent-secondary) 85%, black);
+  transform: translateY(-1px);
+}
+
+/* Quiz-specific components */
+.quiz-card {
+  background-color: color-mix(
+    in srgb,
+    var(--background) 97%,
+    var(--accent-primary)
+  );
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.quiz-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.08);
+}
+
+.timer {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--accent-tertiary);
+}
+
+.timer.warning {
+  color: var(--warning);
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Question styles */
+.question-container {
+  background-color: color-mix(
+    in srgb,
+    var(--background) 99%,
+    var(--accent-secondary)
+  );
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-left: 3px solid var(--accent-primary);
+}
+
+.option {
+  background-color: var(--muted);
+  color: var(--foreground);
+  padding: 0.75rem 1rem;
+  border-radius: 0.375rem;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.option:hover {
+  background-color: var(--accent-secondary);
+}
+
+.option.selected {
+  background-color: var(--accent-primary);
+  color: var(--white);
+}
+
+.option.correct {
+  background-color: var(--success);
+  color: var(--white);
+}
+
+.option.incorrect {
+  background-color: var(--error);
+  color: var(--white);
+}
+
+/* General form elements */
+.input {
+  background-color: color-mix(
+    in srgb,
+    var(--background) 97%,
+    var(--accent-secondary)
+  );
+  border: 1px solid var(--muted);
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  color: var(--foreground);
+  transition: border-color 0.2s ease;
+  width: 100%;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--accent-primary) 25%, transparent);
+}
+
+/* Camera monitor styles */
+.camera-container {
+  border: 2px solid var(--accent-primary);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background-color: var(--muted);
+  position: relative;
+}
+
+.camera-warning {
+  background-color: var(--warning);
+  color: var(--white);
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Code entry */
+.code-input {
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.25rem;
+  text-align: center;
+  font-size: 1.5rem;
+}
+
+/* Results */
+.result-summary {
+  background-color: var(--muted);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.score {
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--accent-primary);
+}
+
+.result-details {
+  margin-top: 1.5rem;
 }
