@@ -1,5 +1,354 @@
-const SignUp = () => {
-  return <div>page</div>;
+"use client";
+
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import Header from "@/components/Header";
+import { useAuth } from "@/contexts/auth-context";
+
+const SignIn = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { login, loginWithGoogle, verifySession } = useAuth();
+  // This extra useEffect helps prevent potential race conditions in navigation
+  useEffect(() => {
+    // Force clear any session cookies when arriving at the sign-in page
+    const clearSessionOnArrival = async () => {
+      try {
+        console.log(
+          "Clearing any existing session cookies on sign-in page arrival"
+        );
+        await fetch("/api/auth/session", {
+          method: "DELETE",
+          credentials: "include",
+        });
+      } catch (e) {
+        console.error("Error clearing session:", e);
+      }
+
+      // Just show the sign-in form without any session checks
+      setCheckingSession(false);
+    };
+
+    clearSessionOnArrival();
+
+    // Set a flag in sessionStorage to indicate we're on the sign-in page
+    // This helps prevent unwanted redirects
+    sessionStorage.setItem("onSignInPage", "true");
+
+    return () => {
+      // Clean up when component unmounts
+      sessionStorage.removeItem("onSignInPage");
+    };
+  }, []);
+
+  // Check for redirect URL or success messages
+  useEffect(() => {
+    const successMsg = searchParams.get("success");
+
+    if (successMsg) {
+      if (successMsg === "verification") {
+        setSuccess("Email verified! You can now sign in.");
+      } else if (successMsg === "password_reset") {
+        setSuccess(
+          "Password has been reset successfully. Please sign in with your new password."
+        );
+      }
+    }
+  }, [searchParams]);
+
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!email || !password) {
+      setError("Please enter both email and password");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError("");
+      setSuccess("");
+
+      const result = await login(email, password);
+
+      if (result.success) {
+        const redirectTo = searchParams.get("redirectTo");
+        router.push(redirectTo || "/");
+      } else {
+        // Handle specific error codes
+        if (
+          result.error?.includes("auth/user-not-found") ||
+          result.error?.includes("auth/wrong-password")
+        ) {
+          setError("Invalid email or password. Please try again.");
+        } else if (result.error?.includes("auth/user-disabled")) {
+          setError("This account has been disabled. Please contact support.");
+        } else if (result.error?.includes("auth/too-many-requests")) {
+          setError(
+            "Too many failed login attempts. Please try again later or reset your password."
+          );
+        } else {
+          setError(
+            result.error || "Failed to sign in. Please check your credentials."
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Sign in error:", err);
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setIsLoading(true);
+      setError("");
+      setSuccess("");
+
+      const result = await loginWithGoogle();
+
+      if (result.success) {
+        const redirectTo = searchParams.get("redirectTo");
+        router.push(redirectTo || "/");
+      } else {
+        // Handle specific Google sign-in errors
+        if (result.error?.includes("popup-closed-by-user")) {
+          setError("Sign-in was cancelled. Please try again.");
+        } else if (
+          result.error?.includes("account-exists-with-different-credential")
+        ) {
+          setError(
+            "An account already exists with the same email address but different sign-in credentials."
+          );
+        } else {
+          setError(
+            result.error || "Failed to sign in with Google. Please try again."
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Google sign in error:", err);
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = () => {
+    router.push(`/reset-password?email=${encodeURIComponent(email)}`);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-white to-neutral-50">
+      <Header />
+
+      <main className="container mx-auto px-4 py-12">
+        <div className="max-w-md mx-auto">
+          <div className="bg-white p-8 rounded-xl shadow-sm">
+            {checkingSession ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+                <p className="text-gray-600">Checking authentication...</p>
+              </div>
+            ) : (
+              <>
+                <div className="text-center mb-8">
+                  <h1 className="text-3xl font-bold mb-2">Welcome Back</h1>
+                  <p className="text-gray-600">
+                    Sign in to your Agenoverse account
+                  </p>
+                </div>
+
+                {success && (
+                  <div className="mb-4 py-2 px-3 bg-green-50 text-green-600 text-sm rounded-md">
+                    {success}
+                  </div>
+                )}
+
+                <form onSubmit={handleSignIn}>
+                  <div className="mb-5">
+                    <label
+                      htmlFor="email"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      id="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary shadow-sm"
+                      placeholder="you@example.com"
+                      required
+                    />
+                  </div>
+
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-1">
+                      <label
+                        htmlFor="password"
+                        className="block text-sm font-medium text-gray-700"
+                      >
+                        Password
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleForgotPassword}
+                        className="text-sm text-blue-600 hover:text-blue-800 transition"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                    <input
+                      type="password"
+                      id="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary shadow-sm"
+                      placeholder="••••••••"
+                      required
+                    />
+                  </div>
+
+                  {error && (
+                    <div className="mb-4 py-2 px-3 bg-red-50 text-red-500 text-sm rounded-md">
+                      {error}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-8 rounded-lg hover:shadow-md transition-all duration-300 transform hover:-translate-y-1 flex items-center justify-center"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <span className="flex items-center">
+                        <svg
+                          className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Signing in...
+                      </span>
+                    ) : (
+                      <span className="flex items-center">
+                        <svg
+                          className="w-5 h-5 mr-2"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M15 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H15"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M10 17L15 12L10 7"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M15 12H3"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                        Sign In
+                      </span>
+                    )}
+                  </button>
+                </form>
+
+                <div className="my-6 flex items-center">
+                  <div className="flex-grow border-t border-gray-200"></div>
+                  <span className="mx-4 text-gray-500 text-sm">OR</span>
+                  <div className="flex-grow border-t border-gray-200"></div>
+                </div>
+
+                <button
+                  onClick={handleGoogleSignIn}
+                  className="w-full flex items-center justify-center bg-white border border-gray-300 rounded-lg px-6 py-3 text-sm font-medium text-gray-800 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 mb-4"
+                  disabled={isLoading}
+                >
+                  <svg
+                    className="h-5 w-5 mr-2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    height="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
+                      <path
+                        fill="#4285F4"
+                        d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M -21.484 53.529 C -21.734 52.809 -21.864 52.039 -21.864 51.239 C -21.864 50.439 -21.724 49.669 -21.484 48.949 L -21.484 45.859 L -25.464 45.859 C -26.284 47.479 -26.754 49.299 -26.754 51.239 C -26.754 53.179 -26.284 54.999 -25.464 56.619 L -21.484 53.529 Z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z"
+                      />
+                    </g>
+                  </svg>
+                  Continue with Google
+                </button>
+
+                <div className="mt-8 text-center">
+                  <p className="text-gray-600">
+                    Don&apos;t have an account?{" "}
+                    <Link
+                      href="/sign-up"
+                      className="text-blue-600 hover:text-blue-800 font-medium transition"
+                    >
+                      Sign Up
+                    </Link>
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
 };
 
-export default SignUp;
+export default SignIn;

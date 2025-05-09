@@ -284,10 +284,10 @@ export async function submitQuizResponse(
 ): Promise<string | null> {
   try {
     // Log authentication state for debugging
-    logAuthState();
-
-    // Get current user ID, or use "anonymous" if not logged in
+    logAuthState();    // Get current user ID, or use "anonymous" if not logged in
     const userId = auth.currentUser?.uid || "anonymous";
+    
+    console.log("Submitting quiz response for user:", userId);
 
     // Get quiz data to calculate score
     const quiz = await getQuizById(quizId);
@@ -325,19 +325,23 @@ export async function submitQuizResponse(
       if (answeredCount > 0) {
         score = Math.round((correctCount / quiz.questions.length) * 100);
       }
-    }
-
-    // Create response document
+    }    // Create response document
     const responsesRef = collection(db, "responses");
+    
+    // Make sure to stringify the user ID to avoid any potential type mismatches
+    const userIdString = userId.toString();
+    
     const responseData = {
       quizId,
-      userId,
+      userId: userIdString,
       startedAt: Timestamp.fromDate(startTime),
       submittedAt: Timestamp.fromDate(new Date()),
       score, // Will be null if auto-check is disabled
       tabSwitchCount: tabSwitches,
       cameraFlags,
     };
+    
+    console.log("Saving response with userId:", userIdString);
 
     // Add the response document and get its ID
     const responseDoc = await addDoc(responsesRef, responseData);
@@ -388,8 +392,7 @@ export async function submitQuizResponse(
 /**
  * Fetch user's quiz attempts
  */
-export async function getUserQuizAttempts(): Promise<QuizAttempt[]> {
-  try {
+export async function getUserQuizAttempts(): Promise<QuizAttempt[]> {  try {
     // Log authentication state for debugging
     logAuthState();
 
@@ -400,127 +403,184 @@ export async function getUserQuizAttempts(): Promise<QuizAttempt[]> {
       return [];
     }
 
-    console.log("Fetching quiz attempts for user ID:", userId);
-
+    console.log("Fetching quiz attempts for user ID:", userId);    
+    
     // CRITICAL DEBUGGING: Print out a list of all responses regardless of userId
     // to see if there are any responses at all
     try {
       const allResponsesRef = collection(db, "responses");
       const allResponses = await getDocs(allResponsesRef);
       console.log("DEBUG: Total responses in database:", allResponses.size);
-      console.log(
-        "DEBUG: First few responses:",
-        allResponses.docs.slice(0, 3).map((doc) => ({
-          id: doc.id,
-          userId: doc.data().userId,
-          data: doc.data(),
-        }))
-      );
-    } catch (err) {
+      
+      // Log the first few responses with their structure
+      if (allResponses.size > 0) {
+        const debugResponses = allResponses.docs.slice(0, 3).map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            userId: data.userId,
+            quizId: data.quizId,
+            startedAt: data.startedAt instanceof Timestamp ? data.startedAt.toDate().toISOString() : null,
+            submittedAt: data.submittedAt instanceof Timestamp ? data.submittedAt.toDate().toISOString() : null,
+          };
+        });
+        console.log("DEBUG: Sample responses:", JSON.stringify(debugResponses, null, 2));
+      }    } catch (err) {
       console.error("Error in debug query:", err);
-    }
-
-    // Query responses collection for user's attempts
+    } 
+      // Query responses collection for user's attempts
     const responsesRef = collection(db, "responses");
-    const q = query(
+    
+    console.log("Current user ID for query:", userId);
+    
+    // Try multiple query approaches to handle different user ID formats 
+    // that might be stored in Firestore
+    
+    // First try exact matching with userId
+    let responsesQuery = query(
       responsesRef,
       where("userId", "==", userId),
       orderBy("submittedAt", "desc")
     );
-
-    const querySnapshot = await getDocs(q);
-    console.log("Query snapshot size:", querySnapshot.size);
-
+    
+    let querySnapshot = await getDocs(responsesQuery);
+    console.log(`Direct query found ${querySnapshot.size} responses with userId: ${userId}`);
+    
+    // If no results with exact match, try with userId as string
     if (querySnapshot.size === 0) {
-      console.log(
-        "No attempts found for user. Checking if responses exist with different user ID format"
+      responsesQuery = query(
+        responsesRef, 
+        where("userId", "==", userId.toString()),
+        orderBy("submittedAt", "desc")
       );
-
-      // Try a more permissive query to see if the userId might be stored differently
-      // For example, some systems might store UIDs as strings vs objects or with different casing
-      const looseQuery = query(responsesRef, orderBy("submittedAt", "desc"));
-
-      const looseResults = await getDocs(looseQuery);
-      console.log("All responses:", looseResults.size);
-      console.log(
-        "All user IDs in responses:",
-        looseResults.docs.map((doc) => ({
-          userId: doc.data().userId,
-          typeOfUserId: typeof doc.data().userId,
-        }))
-      );
-    } else {
-      console.log(
-        "Raw query results:",
-        querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-      );
+      querySnapshot = await getDocs(responsesQuery);
+      console.log(`String userId query found ${querySnapshot.size} responses`);
     }
-
-    // Convert snapshots to QuizAttempt objects
-    const attempts: QuizAttempt[] = [];
-
-    for (const docSnapshot of querySnapshot.docs) {
-      try {
-        const docData = docSnapshot.data();
-        console.log(`Processing document ${docSnapshot.id}:`, docData);
-
-        const attempt = quizAttemptConverter.fromFirestore(docSnapshot);
-
-        // Get the associated quiz details
-        if (attempt.quizId) {
-          console.log(`Fetching quiz details for quizId: ${attempt.quizId}`);
-          const quiz = await getQuizById(attempt.quizId);
-          if (quiz) {
-            attempt.quizTitle = quiz.title;
-            attempt.quizDescription = quiz.description;
-            console.log(`Found quiz: ${quiz.title}`);
-          } else {
-            console.log(`Quiz not found for ID: ${attempt.quizId}`);
-            attempt.quizTitle = "Unknown Quiz"; // Fallback title
+      // If still no results, try a different collection structure
+    if (querySnapshot.size === 0) {
+      console.log("No direct matches found, fetching all responses as a temporary fallback");
+      responsesQuery = query(responsesRef, orderBy("submittedAt", "desc"));
+      querySnapshot = await getDocs(responsesQuery);
+      console.log(`Found ${querySnapshot.size} total responses in the database`);
+      
+      if (querySnapshot.size === 0) {
+        console.log("Trying alternative collection structure...");
+        // Maybe responses are stored in a subcollection of quizzes
+        const quizzesRef = collection(db, "quizzes");
+        const quizzes = await getDocs(quizzesRef);
+        
+        const allResponses = [];
+        for (const quizDoc of quizzes.docs) {
+          // Check if there's a responses subcollection
+          const quizResponsesRef = collection(db, "quizzes", quizDoc.id, "responses");
+          try {
+            const quizResponses = await getDocs(quizResponsesRef);
+            
+            if (quizResponses.size > 0) {
+              console.log(`Found ${quizResponses.size} responses in quiz ${quizDoc.id}`);
+              allResponses.push(...quizResponses.docs);
+            }
+          } catch (err) {
+            console.error(`Error checking for responses in quiz ${quizDoc.id}:`, err);
           }
-        } else {
-          console.log(`No quizId found for attempt ${docSnapshot.id}`);
-          attempt.quizTitle = "Unknown Quiz"; // Fallback title
         }
-
-        // Get the answers subcollection
-        try {
-          const answersRef = collection(
-            db,
-            "responses",
-            docSnapshot.id,
-            "answers"
-          );
-          const answersSnapshot = await getDocs(answersRef);
-          console.log(
-            `Found ${answersSnapshot.size} answers for attempt ${docSnapshot.id}`
-          );
-
-          attempt.answers = answersSnapshot.docs.map((doc) => {
-            const data = doc.data();
-            return {
-              questionId: data.questionId || "",
-              selectedIndex: data.selectedIndex || 0,
-              isCorrect: data.isCorrect,
-            };
-          });
-        } catch (err) {
-          console.error(
-            `Error fetching answers for attempt ${docSnapshot.id}:`,
-            err
-          );
-          attempt.answers = []; // Provide empty answers array as fallback
+        
+        if (allResponses.length > 0) {
+          console.log(`Found ${allResponses.length} total responses in quizzes subcollections`);
+          // Replace the empty querySnapshot with our found responses
+          querySnapshot = {
+            docs: allResponses,
+            size: allResponses.length,
+            forEach: (callback) => allResponses.forEach(callback)
+          } as any;
         }
-
-        attempts.push(attempt);
-        console.log(`Successfully added attempt ${docSnapshot.id} to results`);
-      } catch (err) {
-        console.error(`Error processing attempt ${docSnapshot.id}:`, err);
-        // Continue to the next attempt instead of failing the whole function
       }
     }
-
-    console.log(`Returning ${attempts.length} attempts`);
+      // Process the matching responses
+    const attempts: QuizAttempt[] = [];
+    
+    for (const docSnapshot of querySnapshot.docs) {      try {
+        const docData = docSnapshot.data();
+        
+        // Filter by userId as a fallback when using the "all responses" query
+        if (querySnapshot.size > 10 && docData.userId !== userId && docData.userId !== userId.toString()) {
+          // Skip responses that don't match the current user when we're using all responses
+          continue;
+        }
+        
+        console.log(`Processing response document ${docSnapshot.id}:`, {
+          userId: docData.userId,
+          quizId: docData.quizId,
+          submittedAt: docData.submittedAt ? "Present" : "Missing",
+        });
+        
+        // Convert Firestore timestamp to JavaScript Date
+        const startedAt = docData.startedAt instanceof Timestamp 
+          ? docData.startedAt.toDate() 
+          : new Date();
+          
+        const submittedAt = docData.submittedAt instanceof Timestamp 
+          ? docData.submittedAt.toDate() 
+          : new Date();
+        
+        // Create the attempt object from the response document
+        const attempt: QuizAttempt = {
+          id: docSnapshot.id,
+          quizId: docData.quizId || "",
+          startedAt: startedAt,
+          submittedAt: submittedAt,
+          score: docData.score !== undefined ? docData.score : null,
+          tabSwitchCount: docData.tabSwitchCount || 0,
+          cameraFlags: Array.isArray(docData.cameraFlags) ? docData.cameraFlags : [],
+          answers: []
+        };
+        
+        // Fetch the quiz title and description
+        if (attempt.quizId) {
+          try {
+            const quiz = await getQuizById(attempt.quizId);
+            if (quiz) {
+              attempt.quizTitle = quiz.title;
+              attempt.quizDescription = quiz.description;
+              console.log(`Found quiz: ${quiz.title} for attempt ${docSnapshot.id}`);
+            } else {
+              console.log(`Quiz not found for ID: ${attempt.quizId}`);
+              attempt.quizTitle = "Unknown Quiz";
+            }
+          } catch (quizError) {
+            console.error(`Error fetching quiz for ${attempt.quizId}:`, quizError);
+            attempt.quizTitle = "Unknown Quiz";
+          }
+        } else {
+          attempt.quizTitle = "Unknown Quiz";
+        }        // Fetch answers from the subcollection
+        try {
+          const answersRef = collection(db, "responses", docSnapshot.id, "answers");
+          const answersSnapshot = await getDocs(answersRef);
+          console.log(`Found ${answersSnapshot.size} answers for attempt ${docSnapshot.id}`);
+            if (answersSnapshot.size > 0) {
+            attempt.answers = answersSnapshot.docs.map(answerDoc => {
+              const answerData = answerDoc.data();
+              return {
+                questionId: answerDoc.id, // The document ID in the answers subcollection IS the questionId
+                selectedIndex: answerData.selectedIndex ?? 0,
+                isCorrect: answerData.isCorrect ?? null
+              };
+            });
+          }
+        } catch (answersError) {
+          console.error(`Error fetching answers for attempt ${docSnapshot.id}:`, answersError);
+        }
+        
+        // Add the completed attempt to our results
+        attempts.push(attempt);
+        console.log(`Successfully processed attempt ${docSnapshot.id}`);
+      } catch (err) {
+        console.error(`Error processing attempt ${docSnapshot.id}:`, err);
+      }
+    }
+    
+    console.log(`Returning ${attempts.length} attempts to display in UI`);
     return attempts;
   } catch (error) {
     console.error("Error fetching user quiz attempts:", error);

@@ -9,14 +9,14 @@ const firebaseConfig = {
   apiKey: "AIzaSyCjxaxK8WcMcuCBSw-A4tRzvQ7QkE6m36w",
   authDomain: "ageno-quiz-af3ff.firebaseapp.com",
   projectId: "ageno-quiz-af3ff",
-  storageBucket: "ageno-quiz-af3ff.firebasestorage.app",
+  storageBucket: "ageno-quiz-af3ff.appspot.com", // Fixed storage bucket URL
   messagingSenderId: "1007620282652",
   appId: "1:1007620282652:web:aec978610e1c01334102d9",
   measurementId: "G-8WYX4Y66NY",
 };
 
-// Initialize Firebase
-const app = !getApps.length ? initializeApp(firebaseConfig) : getApp();
+// Initialize Firebase properly
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 export const db = getFirestore(app);
 export const auth = getAuth(app);
