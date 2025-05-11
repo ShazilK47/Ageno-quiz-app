@@ -18,10 +18,12 @@ export default function UserProfile({ isMobile = false }: UserProfileProps) {
     await logout();
     router.push("/sign-in");
   };
-
   if (loading) {
     return (
-      <div className="h-10 w-10 rounded-full bg-gray-200 animate-pulse"></div>
+      <div className="flex items-center gap-2">
+        <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse"></div>
+        <div className="text-sm text-gray-500">Checking authentication...</div>
+      </div>
     );
   }
 

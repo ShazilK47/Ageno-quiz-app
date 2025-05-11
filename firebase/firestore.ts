@@ -28,6 +28,7 @@ export interface Quiz {
   duration: number; // in minutes
   isAutoCheck: boolean;
   accessCode: string;
+  requiresAccessCode?: boolean; // Flag to indicate if access code is required
   questions?: QuizQuestion[];
 }
 
@@ -96,6 +97,8 @@ export const quizConverter = {
       duration: data.duration || 0,
       isAutoCheck: data.isAutoCheck || false,
       accessCode: data.accessCode || "",
+      requiresAccessCode:
+        data.requiresAccessCode !== undefined ? data.requiresAccessCode : true, // Default to true for backwards compatibility
     };
   },
 };
@@ -243,6 +246,13 @@ export async function getQuizByCode(code: string): Promise<Quiz | null> {
 
     const quizDoc = querySnapshot.docs[0];
     const quiz = quizConverter.fromFirestore(quizDoc);
+
+    // Don't allow joining if quiz requires access code but doesn't match
+    if (quiz.requiresAccessCode === true) {
+      if (!code || code.trim() !== quiz.accessCode.trim()) {
+        return null;
+      }
+    }
 
     // Fetch questions subcollection
     const questionsRef = collection(db, "quizzes", quizDoc.id, "questions");

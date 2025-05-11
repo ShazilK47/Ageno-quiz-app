@@ -101,41 +101,47 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const result = await refreshSession(user);
     return result.success;
   };
-
   useEffect(() => {
     const initializeAuth = async () => {
       setLoading(true);
 
-      // First, try to verify the session on the server
-      const sessionResult = await checkSession();
-
-      // If session is valid, listen to auth state changes
+      // Set up auth listener first to avoid blocking the UI
       const unsubscribe = onAuthChange(async (firebaseUser) => {
         if (firebaseUser) {
-          // Try to get role from custom claims first
-          const idTokenResult = await firebaseUser.getIdTokenResult();
-          const roleClaim = idTokenResult.claims.role as Role | undefined;
+          try {
+            // Try to get role from custom claims first
+            const idTokenResult = await firebaseUser.getIdTokenResult();
+            const roleClaim = idTokenResult.claims.role as Role | undefined;
 
-          // Set user with role from token claims if available
-          const userWithRole = {
-            ...firebaseUser,
-            role: roleClaim || "user", // Default to user role if not in claims
-          };
-
-          setUser(userWithRole);
-          setIsAdmin(roleClaim === ROLES.ADMIN);
-        } else {
-          // No Firebase user, but check if we have a valid server session
-          if (sessionResult.isAuthenticated && sessionResult.user) {
-            // We have a valid session but no Firebase user
-            // This might happen when the app loads and Firebase hasn't initialized yet
-            setIsAdmin(sessionResult.user.role === ROLES.ADMIN);
-          } else {
-            setUser(null);
-            setIsAdmin(false);
+            // Set user with role from token claims if available
+            const userWithRole = {
+              ...firebaseUser,
+              role: roleClaim || "user", // Default to user role if not in claims
+            };
+            setUser(userWithRole);
+            setIsAdmin(roleClaim === ROLES.ADMIN);
+          } catch (error) {
+            console.error("Error getting user claims:", error);
           }
+        } else {
+          // No Firebase user, clear the user and admin status
+          setUser(null);
+          setIsAdmin(false);
         }
+
+        // Always set loading to false after auth state is determined
         setLoading(false);
+
+        // Try to verify the session on the server in the background
+        try {
+          const sessionResult = await checkSession();
+          // Update admin status if session provides it
+          if (sessionResult.isAuthenticated && sessionResult.user) {
+            setIsAdmin(sessionResult.user.role === ROLES.ADMIN);
+          }
+        } catch (error) {
+          console.error("Session check error (non-blocking):", error);
+        }
       });
 
       return unsubscribe;

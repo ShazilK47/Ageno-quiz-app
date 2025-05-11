@@ -18,6 +18,14 @@ export default function QuizCard({ quiz }: QuizCardProps) {
 
   const handleJoinClick = (e: React.MouseEvent) => {
     e.preventDefault();
+
+    // If quiz doesn't require access code, redirect directly
+    if (quiz.requiresAccessCode === false) {
+      router.push(`/${quiz.accessCode}`);
+      return;
+    }
+
+    // Otherwise show access code input
     setShowAccessCodeInput(true);
   };
 
@@ -55,12 +63,15 @@ export default function QuizCard({ quiz }: QuizCardProps) {
 
       <div className="flex flex-col h-full relative z-10">
         <div className="p-6 pb-4 border-b border-gray-100 flex justify-between items-start">
+          {" "}
           <h3 className="text-xl font-bold text-gray-800 line-clamp-1 group-hover:text-indigo-700 transition-colors duration-300 tracking-tight relative before:content-[''] before:absolute before:-bottom-1 before:left-0 before:w-0 before:h-0.5 before:bg-indigo-500 group-hover:before:w-16 before:transition-all before:duration-300 pb-1">
             {quiz.title}
           </h3>
-          <span className="px-3 py-1.5 bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 text-xs font-semibold rounded-full flex-shrink-0 ml-2 shadow-sm border border-indigo-100">
-            {quiz.accessCode}
-          </span>
+          {quiz.requiresAccessCode !== false && (
+            <span className="px-3 py-1.5 bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 text-xs font-semibold rounded-full flex-shrink-0 ml-2 shadow-sm border border-indigo-100">
+              {quiz.accessCode}
+            </span>
+          )}
         </div>
 
         <div className="p-6 flex-grow">
@@ -147,11 +158,12 @@ export default function QuizCard({ quiz }: QuizCardProps) {
           </span>
 
           <motion.div whileTap={{ scale: 0.97 }}>
+            {" "}
             <button
               onClick={handleJoinClick}
               className="py-2.5 px-5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white text-sm font-medium rounded-lg hover:from-indigo-700 hover:to-indigo-800 transition-all duration-300 flex items-center gap-1 shadow-md hover:shadow-lg"
             >
-              Join Quiz
+              {quiz.requiresAccessCode === false ? "Start Quiz" : "Join Quiz"}
               <svg
                 width="14"
                 height="14"

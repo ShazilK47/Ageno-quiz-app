@@ -119,10 +119,17 @@ export const checkSession = async (): Promise<{
 }> => {
   try {
     console.log("Sending request to check session");
+    // Add a timeout to prevent hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3-second timeout
+
     const response = await fetch("/api/auth/session/check", {
       method: "GET",
       credentials: "include", // Include cookies
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     // Try to parse the response regardless of status
     let data;

@@ -13,9 +13,7 @@ export default function JoinQuiz() {
   const [error, setError] = useState<string | null>(null);
   const [accessCode, setAccessCode] = useState("");
   const router = useRouter();
-
-  // Check auth status
-  // Check auth status
+  // Check auth state but don't block the UI
   useEffect(() => {
     const unsubscribe = onAuthChange((user) => {
       // Auth state is tracked but not currently used in this component
@@ -189,10 +187,38 @@ export default function JoinQuiz() {
                 </p>
               </div>
             ) : quizzes.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {quizzes.map((quiz) => (
-                  <QuizCard key={quiz.id} quiz={quiz} />
-                ))}
+              <div>
+                {/* Open access quizzes */}
+                {quizzes.some((quiz) => quiz.requiresAccessCode === false) && (
+                  <div className="mb-8">
+                    <h3 className="text-lg font-medium mb-4 text-indigo-700 border-b border-indigo-100 pb-2">
+                      Open Access Quizzes
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {quizzes
+                        .filter((quiz) => quiz.requiresAccessCode === false)
+                        .map((quiz) => (
+                          <QuizCard key={quiz.id} quiz={quiz} />
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Access code protected quizzes */}
+                {quizzes.some((quiz) => quiz.requiresAccessCode !== false) && (
+                  <div>
+                    <h3 className="text-lg font-medium mb-4 text-indigo-700 border-b border-indigo-100 pb-2">
+                      Access Code Required
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {quizzes
+                        .filter((quiz) => quiz.requiresAccessCode !== false)
+                        .map((quiz) => (
+                          <QuizCard key={quiz.id} quiz={quiz} />
+                        ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="bg-white p-8 rounded-xl text-center">

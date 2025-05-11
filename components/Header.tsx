@@ -9,7 +9,7 @@ import { useAuth } from "@/contexts/auth-context";
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -58,11 +58,10 @@ export default function Header() {
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-8">
           <NavLink href="/join">Join Quiz</NavLink>
-          {/* <NavLink href="/assessments">Assessments</NavLink> */}
+          {/* <NavLink href="/assessments">Assessments</NavLink> */}{" "}
           <NavLink href="/leaderboard">Leaderboard</NavLink>
-
           {/* Admin-only navigation links */}
-          {isAdmin && (
+          {user && isAdmin && (
             <>
               <NavLink href="/dashboard">
                 <span className="flex items-center">
@@ -152,13 +151,12 @@ export default function Header() {
           </MobileNavLink>
           {/* <MobileNavLink href="/assessments" onClick={() => setMenuOpen(false)}>
             Assessments
-          </MobileNavLink> */}
+          </MobileNavLink> */}{" "}
           <MobileNavLink href="/leaderboard" onClick={() => setMenuOpen(false)}>
             Leaderboard
           </MobileNavLink>
-
           {/* Admin-only mobile navigation links */}
-          {isAdmin && (
+          {user && isAdmin && (
             <>
               <div className="py-2 border-t border-neutral-200 dark:border-neutral-700">
                 <div className="px-2 py-1 text-sm font-medium text-gray-500">
@@ -205,7 +203,6 @@ export default function Header() {
               </MobileNavLink>
             </>
           )}
-
           <div className="pt-2 border-t border-neutral-200 dark:border-neutral-700">
             <UserProfile isMobile />
           </div>

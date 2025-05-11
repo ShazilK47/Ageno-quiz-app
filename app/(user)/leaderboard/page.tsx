@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import Header from "@/components/Header";
 import {
   collection,
   query,
