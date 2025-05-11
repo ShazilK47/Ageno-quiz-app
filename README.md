@@ -9,7 +9,7 @@ Examverse is a modern web-based exam and quiz platform focused on **security**, 
 - **Frontend**: Next.js + TypeScript
 - **Styling**: Tailwind CSS
 - **Database**: Firebase Firestore
-- **Auth**: Firebase Authentication
+- **Auth**: Firebase Authentication with SWR
 - **Media Access**: WebRTC/MediaDevices API
 - **Hosting**: Vercel
 
@@ -20,6 +20,9 @@ Examverse is a modern web-based exam and quiz platform focused on **security**, 
 - ✅ Create and manage multiple quizzes
 - ✅ Add MCQs with options and optional timers
 - ✅ User authentication (admin/student)
+- ✅ SWR-based auth hook with caching and revalidation
+- ✅ Enhanced error handling for auth operations
+- ✅ Multi-factor authentication support
 - ✅ Enter quiz via access code
 - ✅ Real-time camera and mic access
 - ✅ Automatic answer checking and scoring
@@ -31,7 +34,7 @@ Examverse is a modern web-based exam and quiz platform focused on **security**, 
 
 ## 📂 Folder Structure
 
-```
+````
 
 /pages
 /admin ← Admin dashboard, quiz creation
@@ -49,7 +52,30 @@ quiz.ts ← Quiz & question types
 /components
 Question.tsx, Timer.tsx, QuizCard.tsx
 
-```
+---
+
+## 🔐 Enhanced Authentication with useAuth Hook
+
+The application uses a custom `useAuth` hook that enhances authentication with SWR caching:
+
+```typescript
+import { useAuth } from '@/hooks/useAuth';
+
+// In your component
+const { user, loading, isAdmin, login, logout } = useAuth();
+````
+
+### Key Benefits:
+
+- **Optimized Performance**: SWR caching reduces unnecessary API calls
+- **Automatic Session Revalidation**: Session stays fresh with focus/reconnect events
+- **Consistent Error Handling**: Standardized error responses across all auth operations
+- **Type Safety**: Full TypeScript support with detailed interfaces
+- **Enhanced Security**: Improved session management and validation
+
+For detailed documentation, see [useAuth documentation](./docs/useAuth.md).
+
+````
 
 ---
 
@@ -60,7 +86,7 @@ Question.tsx, Timer.tsx, QuizCard.tsx
 ```bash
 git clone https://github.com/your-username/ageno-quiz.git
 cd ageno-quiz
-```
+````
 
 ### 2. Install Dependencies
 

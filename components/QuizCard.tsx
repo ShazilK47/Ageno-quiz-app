@@ -1,6 +1,5 @@
 // components/QuizCard.tsx
 import { useState } from "react";
-import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { Quiz } from "@/firebase/firestore";
 import { motion } from "framer-motion";
@@ -218,7 +217,9 @@ export default function QuizCard({ quiz }: QuizCardProps) {
                 <h2 className="text-lg font-bold text-gray-800">
                   Access Code Required
                 </h2>
-                <p className="text-gray-600 text-sm">For "{quiz.title}"</p>
+                <p className="text-gray-600 text-sm">
+                  For &quot;{quiz.title}&quot;
+                </p>
               </div>
               <button
                 onClick={handleCancel}

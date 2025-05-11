@@ -15,7 +15,7 @@ const SignIn = () => {
   const [checkingSession, setCheckingSession] = useState(true);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, loginWithGoogle, verifySession } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   // This extra useEffect helps prevent potential race conditions in navigation
   useEffect(() => {
     // Force clear any session cookies when arriving at the sign-in page

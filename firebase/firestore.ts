@@ -24,6 +24,7 @@ export interface Quiz {
   description: string;
   createdBy: string;
   createdAt: Date;
+  updatedAt?: Date;
   duration: number; // in minutes
   isAutoCheck: boolean;
   accessCode: string;
@@ -33,12 +34,31 @@ export interface Quiz {
 export interface QuizQuestion {
   id: string;
   text: string;
-  options: {
-    id: string;
-    text: string;
-  }[];
-  correctIndex: number;
-  type: "mcq" | "truefalse" | string;
+  options: QuizOption[];
+  points: number;
+  type?: "single" | "multiple" | "truefalse" | string;
+  correctIndex?: number; // Added for backward compatibility
+}
+
+export interface QuizOption {
+  id: string;
+  text: string;
+  isCorrect: boolean;
+}
+
+// Quiz submission interface
+export interface QuizSubmission {
+  id: string;
+  quizId: string;
+  userId: string;
+  answers: Record<string, string[]>; // questionId -> selected option ids
+  startedAt: Date;
+  completedAt: Date;
+  createdAt: Date;
+  score: number | null;
+  maxScore?: number;
+  percentage?: number;
+  gradedAt?: Date | null;
 }
 
 export interface QuizAttempt {
@@ -158,9 +178,7 @@ export async function getQuizById(quizId: string): Promise<Quiz | null> {
       return null;
     }
 
-    const quiz = quizConverter.fromFirestore(quizSnapshot);
-
-    // Fetch questions subcollection
+    const quiz = quizConverter.fromFirestore(quizSnapshot); // Fetch questions subcollection
     const questionsRef = collection(db, "quizzes", quizId, "questions");
     const questionsSnapshot = await getDocs(questionsRef);
 
@@ -183,13 +201,13 @@ export async function getQuizById(quizId: string): Promise<Quiz | null> {
           );
         }
       }
-
       return {
         id: doc.id,
         text: data.text || "",
         options: options,
         correctIndex: data.correctIndex || 0,
         type: data.type || "mcq",
+        points: data.points || 1, // Default to 1 point if not specified
       };
     });
 
@@ -249,13 +267,13 @@ export async function getQuizByCode(code: string): Promise<Quiz | null> {
           );
         }
       }
-
       return {
         id: doc.id,
         text: data.text || "",
         options: options,
         correctIndex: data.correctIndex || 0,
         type: data.type || "mcq",
+        points: data.points || 1, // Default to 1 point if not specified
       };
     });
 

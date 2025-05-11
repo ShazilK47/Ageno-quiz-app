@@ -17,7 +17,7 @@ const SignUp = () => {
   const [passwordStrength, setPasswordStrength] = useState("");
   const [checkingSession, setCheckingSession] = useState(true);
   const router = useRouter();
-  const { signUp, loginWithGoogle, verifySession } = useAuth(); // This extra useEffect helps prevent potential race conditions in navigation
+  const { signUp, loginWithGoogle } = useAuth(); // This extra useEffect helps prevent potential race conditions in navigation
 
   // Set a flag when first navigating to the sign-up page
   useEffect(() => {

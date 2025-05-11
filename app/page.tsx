@@ -16,7 +16,15 @@ export default function Home() {
         <div className="absolute inset-0 bg-[url('/hero-pattern.svg')] opacity-5 z-0"></div>
         <div className="container mx-auto px-4 pt-20 pb-24 text-center relative z-10">
           <div className="animate-fadeIn">
-            <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-purple-primary to-tech-blue-light">
+            <h1
+              className="text-5xl md:text-6xl font-bold mb-6"
+              style={{
+                background: "linear-gradient(to right, #7e22ce, #38bdf8)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                display: "inline-block",
+              }}
+            >
               Agenoverse Assessment Portal
             </h1>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-10 leading-relaxed">

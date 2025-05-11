@@ -1,0 +1,9 @@
+"use client";
+
+export interface User {
+  id: string;
+  email: string;
+  displayName: string;
+  role: string;
+  createdAt: any; // Firestore timestamp or Date
+}
