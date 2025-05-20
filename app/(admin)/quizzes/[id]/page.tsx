@@ -18,6 +18,7 @@ import { db } from "@/firebase/client";
 import { handleFirebaseError } from "@/firebase/utils";
 import AdminProtected from "@/components/AdminProtected";
 import Header from "@/components/Header";
+import ScoresByDifficultyChart from "@/components/analytics/ScoresByDifficultyChart";
 
 interface Question {
   id: string;
@@ -263,19 +264,16 @@ export default function QuizDetailsPage() {
                   </Link>
                 </div>
               </div>
-
               {updateSuccess && (
                 <div className="mb-6 p-4 bg-green-50 text-green-600 rounded-md">
                   {updateSuccess}
                 </div>
               )}
-
               {error && (
                 <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-md">
                   {error}
                 </div>
-              )}
-
+              )}{" "}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 <div className="bg-white shadow-sm rounded-lg p-6 border border-gray-100">
                   <h2 className="text-xl font-semibold mb-4">
@@ -344,7 +342,6 @@ export default function QuizDetailsPage() {
 
                 <div className="bg-white shadow-sm rounded-lg p-6 border border-gray-100">
                   <h2 className="text-xl font-semibold mb-4">Quiz Actions</h2>
-
                   <div className="space-y-4">
                     <Link
                       href={`/quiz/join?code=${quiz.code}`}
@@ -381,10 +378,15 @@ export default function QuizDetailsPage() {
                     >
                       Delete Quiz
                     </button>
-                  </div>
+                  </div>{" "}
                 </div>
               </div>
-
+              <div className="bg-white shadow-sm rounded-lg p-6 border border-gray-100 mb-8">
+                <h2 className="text-xl font-semibold mb-4">
+                  Performance Analytics
+                </h2>
+                <ScoresByDifficultyChart quizId={quiz.id} />
+              </div>
               <div className="bg-white shadow-sm rounded-lg p-6 border border-gray-100">
                 <h2 className="text-xl font-semibold mb-4">Questions</h2>
 
@@ -458,7 +460,6 @@ export default function QuizDetailsPage() {
                   </div>
                 )}
               </div>
-
               {/* Delete Confirmation Modal */}
               {deleteConfirmation && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

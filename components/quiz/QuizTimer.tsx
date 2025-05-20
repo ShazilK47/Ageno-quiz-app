@@ -7,20 +7,47 @@ interface QuizTimerProps {
   duration: number; // in minutes
   onTimeUp: () => void;
   paused?: boolean;
+  timeRemaining: number | null;
+  setTimeRemaining: React.Dispatch<React.SetStateAction<number | null>>;
 }
 
 export default function QuizTimer({
   duration,
   onTimeUp,
   paused = false,
+  timeRemaining,
+  setTimeRemaining,
 }: QuizTimerProps) {
+  // Validate and normalize duration - ensure it's a positive number
+  const validDuration =
+    typeof duration === "number" && !isNaN(duration) && duration > 0
+      ? duration
+      : 30; // Default to 30 minutes if duration is invalid
+
   // Convert minutes to seconds
-  const totalSeconds = duration * 60;
-  const [timeRemaining, setTimeRemaining] = useState(totalSeconds);
+  const totalSeconds = validDuration * 60;
+
+  // Log warning if duration was invalid
+  useEffect(() => {
+    if (validDuration !== duration) {
+      console.warn(
+        `Invalid quiz duration (${duration}), defaulting to ${validDuration} minutes`
+      );
+    }
+  }, [duration, validDuration]);
+
+  // Initialize time remaining if it's null
+  useEffect(() => {
+    if (timeRemaining === null) {
+      setTimeRemaining(totalSeconds);
+    }
+  }, [totalSeconds, timeRemaining, setTimeRemaining]);
+
   const [isWarning, setIsWarning] = useState(false);
 
   // Format seconds to mm:ss
-  const formatTime = useCallback((seconds: number) => {
+  const formatTime = useCallback((seconds: number | null) => {
+    if (seconds === null) return "00:00";
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, "0")}:${secs
@@ -28,21 +55,34 @@ export default function QuizTimer({
       .padStart(2, "0")}`;
   }, []);
 
-  // Calculate progress percentage
-  const progressPercentage = (timeRemaining / totalSeconds) * 100;
+  // Calculate progress percentage with safety checks
+  const progressPercentage =
+    timeRemaining !== null && totalSeconds > 0
+      ? Math.max(0, Math.min(100, (timeRemaining / totalSeconds) * 100))
+      : 100;
 
   // Set warning state when less than 20% time remains
   useEffect(() => {
-    setIsWarning(progressPercentage < 20);
-  }, [progressPercentage]);
-
+    if (timeRemaining !== null) {
+      setIsWarning(progressPercentage < 20);
+    }
+  }, [progressPercentage, timeRemaining]);
   // Timer logic
   useEffect(() => {
-    if (paused || timeRemaining <= 0) return;
+    if (paused || timeRemaining === null || timeRemaining <= 0) return;
 
     const timer = setInterval(() => {
-      setTimeRemaining((prev) => {
-        const newTime = prev - 1;
+      setTimeRemaining((prev: number | null) => {
+        // Safety check for null values
+        if (prev === null) return null;
+
+        // Ensure prev is a number and not NaN before decrementing
+        if (isNaN(prev)) {
+          console.error("Timer value is NaN, resetting to initial duration");
+          return totalSeconds; // Reset to initial duration if we get a NaN
+        }
+
+        const newTime: number = prev - 1;
         if (newTime <= 0) {
           clearInterval(timer);
           onTimeUp();
@@ -53,7 +93,7 @@ export default function QuizTimer({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [timeRemaining, onTimeUp, paused]);
+  }, [timeRemaining, onTimeUp, paused, setTimeRemaining]);
 
   // Warning animation for last 20% of time
   const pulseAnimation = isWarning

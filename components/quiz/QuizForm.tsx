@@ -1,12 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useFirestore } from "@/hooks/useFirestore";
 import { useAuth } from "@/contexts/auth-context";
 import { motion, AnimatePresence } from "framer-motion";
 import ImageUploader from "./ImageUploader";
+import DifficultySettings from "./DifficultySettings";
+import {
+  saveAllQuestionsByDifficulty,
+  getQuestionsByDifficulty,
+} from "@/firebase/quizDifficulty";
 
 interface QuizQuestion {
   id: string;
@@ -27,6 +32,12 @@ interface QuizFormProps {
     code: string;
     questions: QuizQuestion[];
     requiresAccessCode?: boolean;
+    availableDifficulties?: string[]; // Added to support difficulty levels
+    difficultySettings?: {
+      easy?: { duration: number; pointsMultiplier: number };
+      medium?: { duration: number; pointsMultiplier: number };
+      hard?: { duration: number; pointsMultiplier: number };
+    };
   };
   mode: "create" | "edit";
   onSubmitSuccess?: (quizId: string) => void;
@@ -40,18 +51,21 @@ export default function QuizForm({
   const router = useRouter();
   const { user } = useAuth();
   const { createDocument, updateDocument, isLoading } = useFirestore("quizzes");
-  const defaultQuestion: QuizQuestion = {
-    id: crypto.randomUUID(),
-    text: "",
-    options: [
-      { id: crypto.randomUUID(), text: "", isCorrect: false },
-      { id: crypto.randomUUID(), text: "", isCorrect: false },
-      { id: crypto.randomUUID(), text: "", isCorrect: false },
-      { id: crypto.randomUUID(), text: "", isCorrect: false },
-    ],
-    points: 1,
-    imageUrl: "",
-  };
+  const defaultQuestion = useMemo(
+    () => ({
+      id: crypto.randomUUID(),
+      text: "",
+      options: [
+        { id: crypto.randomUUID(), text: "", isCorrect: false },
+        { id: crypto.randomUUID(), text: "", isCorrect: false },
+        { id: crypto.randomUUID(), text: "", isCorrect: false },
+        { id: crypto.randomUUID(), text: "", isCorrect: false },
+      ],
+      points: 1,
+      imageUrl: "",
+    }),
+    []
+  );
 
   // Form state
   const [title, setTitle] = useState("");
@@ -69,6 +83,34 @@ export default function QuizForm({
   const [isImporting, setIsImporting] = useState(false);
   const [importText, setImportText] = useState("");
 
+  // New state for difficulty levels
+  const [availableDifficulties, setAvailableDifficulties] = useState<string[]>([
+    "easy",
+    "medium",
+    "hard",
+  ]);
+  const [currentDifficulty, setCurrentDifficulty] = useState<string>("medium");
+  const [questionsByDifficulty, setQuestionsByDifficulty] = useState<{
+    easy: QuizQuestion[];
+    medium: QuizQuestion[];
+    hard: QuizQuestion[];
+  }>({
+    easy: [],
+    medium: [defaultQuestion],
+    hard: [],
+  });
+
+  // New state for difficulty settings
+  const [difficultySettings, setDifficultySettings] = useState<{
+    easy: { duration: number; pointsMultiplier: number };
+    medium: { duration: number; pointsMultiplier: number };
+    hard: { duration: number; pointsMultiplier: number };
+  }>({
+    easy: { duration: 30, pointsMultiplier: 1.0 },
+    medium: { duration: 25, pointsMultiplier: 1.5 },
+    hard: { duration: 20, pointsMultiplier: 2.0 },
+  });
+
   // Initialize form with initial quiz data if in edit mode
   useEffect(() => {
     if (initialQuiz) {
@@ -82,13 +124,108 @@ export default function QuizForm({
           ? initialQuiz.requiresAccessCode
           : true
       );
-      setQuestions(
-        initialQuiz.questions?.length > 0
-          ? initialQuiz.questions
-          : [defaultQuestion]
-      );
+
+      // Load available difficulties if they exist
+      const availableDiffs = initialQuiz.availableDifficulties || ["medium"];
+      setAvailableDifficulties(availableDiffs);
+
+      // Load difficulty settings if they exist
+      if (initialQuiz.difficultySettings) {
+        setDifficultySettings({
+          easy: initialQuiz.difficultySettings.easy || {
+            duration: 30,
+            pointsMultiplier: 1.0,
+          },
+          medium: initialQuiz.difficultySettings.medium || {
+            duration: 25,
+            pointsMultiplier: 1.5,
+          },
+          hard: initialQuiz.difficultySettings.hard || {
+            duration: 20,
+            pointsMultiplier: 2.0,
+          },
+        });
+      }
+
+      if (initialQuiz.id && mode === "edit") {
+        // Load questions for each difficulty if in edit mode and we have an ID
+        const loadQuestionsByDifficulty = async () => {
+          try {
+            // Create an object to store questions by difficulty
+            const questionsByDiff = {
+              easy: [] as QuizQuestion[],
+              medium: [] as QuizQuestion[],
+              hard: [] as QuizQuestion[],
+            };
+
+            // Load questions for each available difficulty
+            for (const difficulty of availableDiffs) {
+              const loadedQuestions = await getQuestionsByDifficulty(
+                initialQuiz.id!,
+                difficulty
+              );
+              // Use type assertion to tell TypeScript this is a valid key
+              (questionsByDiff as Record<string, QuizQuestion[]>)[difficulty] =
+                loadedQuestions.length > 0
+                  ? loadedQuestions
+                  : difficulty === "medium"
+                  ? [defaultQuestion]
+                  : [];
+            }
+
+            // Update state with the loaded questions
+            setQuestionsByDifficulty(questionsByDiff);
+
+            // Set the current questions to the medium difficulty or first available difficulty
+            const defaultDifficulty = availableDiffs.includes("medium")
+              ? "medium"
+              : availableDiffs[0];
+            setCurrentDifficulty(defaultDifficulty);
+            setQuestions(
+              (questionsByDiff as Record<string, QuizQuestion[]>)[
+                defaultDifficulty
+              ]
+            );
+          } catch (error) {
+            console.error("Error loading questions by difficulty:", error);
+
+            // Fallback to using questions from initialQuiz if loading fails
+            const questionsToSet =
+              initialQuiz.questions?.length > 0
+                ? initialQuiz.questions
+                : [defaultQuestion];
+
+            setQuestions(questionsToSet);
+            setQuestionsByDifficulty({
+              easy: [],
+              medium: questionsToSet,
+              hard: [],
+            });
+          }
+        };
+
+        loadQuestionsByDifficulty();
+      } else {
+        // For new quizzes, just use the default setup
+        const questionsToSet =
+          initialQuiz.questions?.length > 0
+            ? initialQuiz.questions
+            : [defaultQuestion];
+
+        setQuestions(questionsToSet);
+        setQuestionsByDifficulty({
+          easy: [],
+          medium: questionsToSet,
+          hard: [],
+        });
+      }
+
+      // Load available difficulties if they exist
+      if (initialQuiz.availableDifficulties) {
+        setAvailableDifficulties(initialQuiz.availableDifficulties);
+      }
     }
-  }, [initialQuiz]);
+  }, [initialQuiz, defaultQuestion, mode]);
 
   // Generate a random access code
   const generateAccessCode = () => {
@@ -102,7 +239,7 @@ export default function QuizForm({
     setCode(result);
   };
 
-  // Add a new question
+  // Add a new question to the current difficulty level
   const addQuestion = () => {
     const newQuestion = {
       id: crypto.randomUUID(),
@@ -116,7 +253,22 @@ export default function QuizForm({
       points: 1,
     };
 
-    setQuestions([...questions, newQuestion]);
+    // Update both the main questions array and the difficulty-specific array
+    const newQuestions = [...questions, newQuestion];
+    setQuestions(newQuestions);
+
+    // Update the questions for the current difficulty
+    const updatedQuestionsByDifficulty = { ...questionsByDifficulty };
+    updatedQuestionsByDifficulty[
+      currentDifficulty as keyof typeof questionsByDifficulty
+    ] = [
+      ...updatedQuestionsByDifficulty[
+        currentDifficulty as keyof typeof questionsByDifficulty
+      ],
+      newQuestion,
+    ];
+    setQuestionsByDifficulty(updatedQuestionsByDifficulty);
+
     setCurrentQuestionIndex(questions.length);
   };
 
@@ -484,14 +636,22 @@ export default function QuizForm({
     try {
       setFormError(null);
 
+      // Save current questions to the current difficulty before submission
+      const finalQuestionsByDifficulty = { ...questionsByDifficulty };
+      finalQuestionsByDifficulty[
+        currentDifficulty as keyof typeof questionsByDifficulty
+      ] = questions;
+
       const quizData = {
         title,
         description,
-        timeLimit,
+        timeLimit, // Keep for backward compatibility
         active,
         code,
         requiresAccessCode,
-        questions,
+        questions, // Keep for backward compatibility
+        availableDifficulties, // Add available difficulties
+        difficultySettings, // Add difficulty-specific settings
         createdBy: user.uid,
         createdAt: new Date(),
         autoCheck: isAutoCheck,
@@ -501,12 +661,28 @@ export default function QuizForm({
 
       if (mode === "create") {
         result = await createDocument(quizData);
+
+        // Save questions by difficulty for the new quiz
+        await saveAllQuestionsByDifficulty(
+          result.id,
+          finalQuestionsByDifficulty,
+          availableDifficulties
+        );
+
         setSuccess("Quiz created successfully!");
       } else if (mode === "edit" && initialQuiz?.id) {
         result = await updateDocument(initialQuiz.id, {
           ...quizData,
           updatedAt: new Date(),
         });
+
+        // Save questions by difficulty for the existing quiz
+        await saveAllQuestionsByDifficulty(
+          initialQuiz.id,
+          finalQuestionsByDifficulty,
+          availableDifficulties
+        );
+
         setSuccess("Quiz updated successfully!");
       }
 
@@ -536,6 +712,67 @@ export default function QuizForm({
         setFormError("Failed to save quiz. Please try again.");
       }
     }
+  };
+
+  // Switch between difficulty levels
+  const switchDifficulty = (difficulty: string) => {
+    // Save current questions for the current difficulty
+    const updatedQuestionsByDifficulty = { ...questionsByDifficulty };
+    updatedQuestionsByDifficulty[
+      currentDifficulty as keyof typeof questionsByDifficulty
+    ] = questions;
+
+    // Switch to the selected difficulty and load its questions
+    setCurrentDifficulty(difficulty);
+    setQuestions(
+      updatedQuestionsByDifficulty[
+        difficulty as keyof typeof questionsByDifficulty
+      ]
+    );
+
+    // Reset current question index
+    setCurrentQuestionIndex(0);
+  };
+
+  // Toggle a difficulty in availableDifficulties array
+  const toggleDifficulty = (difficulty: string) => {
+    if (availableDifficulties.includes(difficulty)) {
+      // Remove difficulty if it's already selected
+      if (availableDifficulties.length > 1) {
+        // Ensure at least one difficulty is selected
+        setAvailableDifficulties(
+          availableDifficulties.filter((d) => d !== difficulty)
+        );
+      }
+    } else {
+      // Add difficulty if not already selected
+      setAvailableDifficulties([...availableDifficulties, difficulty]);
+    }
+  };
+
+  // Handler for updating difficulty duration
+  const handleDurationChange = (difficulty: string, duration: number) => {
+    setDifficultySettings((prev) => ({
+      ...prev,
+      [difficulty]: {
+        ...prev[difficulty as keyof typeof prev],
+        duration,
+      },
+    }));
+  };
+
+  // Handler for updating difficulty point multiplier
+  const handleMultiplierChange = (
+    difficulty: string,
+    pointsMultiplier: number
+  ) => {
+    setDifficultySettings((prev) => ({
+      ...prev,
+      [difficulty]: {
+        ...prev[difficulty as keyof typeof prev],
+        pointsMultiplier,
+      },
+    }));
   };
 
   return (
@@ -690,6 +927,18 @@ export default function QuizForm({
                   </label>
                 </div>
               </div>
+
+              {/* Difficulty Settings Component */}
+              {availableDifficulties.length > 0 && (
+                <div className="col-span-2 mt-4">
+                  <DifficultySettings
+                    availableDifficulties={availableDifficulties}
+                    difficultySettings={difficultySettings}
+                    onDurationChange={handleDurationChange}
+                    onMultiplierChange={handleMultiplierChange}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -769,6 +1018,42 @@ export default function QuizForm({
                 </div>
               </div>
             )}
+
+            {/* Difficulty level switcher */}
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex space-x-2">
+                {availableDifficulties.map((difficulty) => (
+                  <button
+                    key={difficulty}
+                    type="button"
+                    onClick={() => switchDifficulty(difficulty)}
+                    className={`px-3 py-1 rounded-md text-sm ${
+                      currentDifficulty === difficulty
+                        ? "bg-purple-600 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+                  </button>
+                ))}
+              </div>
+              <div className="flex space-x-2">
+                {["easy", "medium", "hard"].map((difficulty) => (
+                  <button
+                    key={difficulty}
+                    type="button"
+                    onClick={() => toggleDifficulty(difficulty)}
+                    className={`px-3 py-1 rounded-md text-sm ${
+                      availableDifficulties.includes(difficulty)
+                        ? "bg-purple-600 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* Question navigation */}
             {!isReordering && questions.length > 0 && (

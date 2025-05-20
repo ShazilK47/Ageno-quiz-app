@@ -71,6 +71,7 @@ export default function CreateQuizForm({ onSuccess }: CreateQuizFormProps) {
         requiresAccessCode,
         active: true,
         questions: [],
+        availableDifficulties: ["easy", "medium", "hard"], // Default to all difficulty levels
         createdBy: user.uid,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),

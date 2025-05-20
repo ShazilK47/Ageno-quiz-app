@@ -1,9 +1,15 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import { getQuizByCode, Quiz, submitQuizResponse } from "@/firebase/firestore";
+import DifficultySelect from "@/components/quiz/DifficultySelect";
+import QuizTimer from "@/components/quiz/QuizTimer";
+import { getQuestionsByDifficulty } from "@/firebase/quizDifficulty";
+import { FixedScoreDisplay } from "@/components/quiz/FixedScoreDisplay";
+import { CorrectAnswersDisplay } from "@/components/quiz/CorrectAnswersDisplay";
+import { autoLoadQuestionsForDifficulty } from "./auto-load-questions";
 
 interface UserAnswer {
   questionId: string;
@@ -27,12 +33,28 @@ export default function QuizPage({
   const [quizStartTime, setQuizStartTime] = useState<Date | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<UserAnswer[]>([]);
-  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [score, setScore] = useState<number | null>(null);
   const [responseId, setResponseId] = useState<string | null>(null);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+
+  // Create a ref to track the latest calculated score value to avoid state closure issues
+  const lastCalculatedScoreRef = useRef<number | null>(null);
+  // Add a ref to track if score was calculated, even if the state update fails
+  const scoreCalculatedRef = useRef<boolean>(false);
+
+  // Difficulty level state
+  const [availableDifficulties, setAvailableDifficulties] = useState<string[]>([
+    "easy",
+    "medium",
+    "hard",
+  ]);
+  const [selectedDifficulty, setSelectedDifficulty] =
+    useState<string>("medium");
+  const [difficultySelected, setDifficultySelected] = useState<boolean>(false);
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState<boolean>(false);
 
   // Track tab visibility changes for proctoring
   useEffect(() => {
@@ -53,6 +75,30 @@ export default function QuizPage({
     };
   }, [quizStarted, quizSubmitted]);
 
+  // Ensure score is preserved when quiz is submitted
+  useEffect(() => {
+    if (
+      quizSubmitted &&
+      score === null &&
+      lastCalculatedScoreRef.current !== null
+    ) {
+      console.log("Restoring score from ref:", lastCalculatedScoreRef.current);
+      setScore(lastCalculatedScoreRef.current);
+    }
+  }, [quizSubmitted, score]);
+
+  // Add effect to log score states for debugging
+  useEffect(() => {
+    if (quizSubmitted) {
+      console.log(
+        `Score state debug - state:${score}, ref:${lastCalculatedScoreRef.current}, calculated:${scoreCalculatedRef.current}`
+      );
+    }
+  }, [quizSubmitted, score]);
+
+  // We'll use a single useEffect for auto-loading questions
+  // that will be created after the loadQuestionsForDifficulty function is defined
+
   useEffect(() => {
     const fetchQuiz = async () => {
       if (!code) return;
@@ -64,6 +110,28 @@ export default function QuizPage({
         if (!quizData) {
           setError("Quiz not found or no longer active");
           return;
+        }
+
+        // Set available difficulties if they exist in quiz data
+        if (
+          quizData.availableDifficulties &&
+          quizData.availableDifficulties.length > 0
+        ) {
+          setAvailableDifficulties(quizData.availableDifficulties);
+          // Prefer "medium" difficulty if available, otherwise default to first available
+          const mediumDifficultyExists =
+            quizData.availableDifficulties.includes("medium");
+          const defaultDifficulty = mediumDifficultyExists
+            ? "medium"
+            : quizData.availableDifficulties[0];
+
+          // Set selectedDifficulty here but not difficultySelected
+          // This triggers the auto-load effect to load questions for this difficulty
+          setSelectedDifficulty(defaultDifficulty);
+          console.log(`Default difficulty set to: ${defaultDifficulty}`);
+
+          // Note: We intentionally don't set difficultySelected=true here
+          // so that the auto-loading effect can trigger and load questions
         }
 
         // Enhanced debugging to understand the data structure
@@ -94,6 +162,7 @@ export default function QuizPage({
               const newOptions = numericKeys.map((key) => ({
                 id: key,
                 text: String(q[key as keyof typeof q]),
+                isCorrect: Number(key) === q.correctIndex, // Set isCorrect based on correctIndex
               }));
               console.log("Created options from numeric keys:", newOptions);
               return { ...q, options: newOptions };
@@ -114,34 +183,352 @@ export default function QuizPage({
     fetchQuiz();
   }, [code]);
 
-  // Timer effect for the quiz
+  // All auto-loading functionality will be consolidated into a single useEffect
+  // that will be defined after the loadQuestionsForDifficulty function
+
+  // Check if questions are already loaded when the component mounts
   useEffect(() => {
-    let timerInterval: NodeJS.Timeout | null = null;
+    // Debug the current state
+    console.log(`[PRELOADED-CHECK] Component state:`, {
+      hasQuestions: quiz?.questions && quiz.questions.length > 0,
+      questionsCount: quiz?.questions?.length || 0,
+      difficultySelected,
+      isLoadingQuestions,
+      selectedDifficulty,
+    });
 
-    if (quizStarted && quiz && !quizSubmitted) {
-      // Set initial time in seconds
-      setTimeRemaining(quiz.duration * 60);
+    if (
+      quiz?.questions &&
+      quiz.questions.length > 0 &&
+      !difficultySelected &&
+      !isLoadingQuestions
+    ) {
+      console.log(
+        `[PRELOADED-CHECK] Questions already loaded in quiz (${
+          quiz?.questions?.length || 0
+        } questions), marking difficulty as selected`
+      );
+      setDifficultySelected(true);
+      console.log(
+        `[PRELOADED-CHECK] Currently selected difficulty: ${selectedDifficulty}`
+      );
 
-      timerInterval = setInterval(() => {
-        setTimeRemaining((prev) => {
-          if (prev === null || prev <= 0) {
-            // Auto-submit when time is up
-            if (timerInterval) clearInterval(timerInterval);
-            handleSubmitQuiz();
-            return 0;
+      // Initialize user answers if not already done
+      if (userAnswers.length === 0 && quiz?.questions) {
+        const initialAnswers = quiz.questions.map((q) => ({
+          questionId: q.id,
+          selectedOptionIndex: null,
+        }));
+        setUserAnswers(initialAnswers);
+        console.log(
+          `[PRELOADED-CHECK] Initialized ${initialAnswers.length} user answers for pre-loaded questions`
+        );
+      }
+    } else if (
+      quiz?.questions?.length === 0 &&
+      !isLoadingQuestions &&
+      selectedDifficulty
+    ) {
+      // This case handles when we have a selected difficulty but no questions
+      console.log(
+        `[PRELOADED-CHECK] Selected difficulty ${selectedDifficulty} but no questions available`
+      );
+      // We may need to auto-load if not already trying to load
+      console.log(`[PRELOADED-CHECK] Auto-load trigger check:`, {
+        difficultySelected,
+        quizId: quiz?.id,
+        isLoadingQuestions,
+      });
+    }
+  }, [
+    quiz?.questions,
+    quiz?.questions?.length,
+    difficultySelected,
+    isLoadingQuestions,
+    userAnswers.length,
+    selectedDifficulty,
+    quiz?.id,
+  ]);
+
+  // Load questions for selected difficulty - memoized to avoid dependency issues
+  const loadQuestionsForDifficulty = useCallback(
+    async (difficulty: string) => {
+      if (!quiz || !quiz.id) {
+        console.warn(`Cannot load questions: quiz or quiz.id is missing`);
+        return false; // Indicate failure
+      }
+
+      setIsLoadingQuestions(true);
+
+      try {
+        // Get questions for the selected difficulty
+        console.log(
+          `Loading ${difficulty} difficulty questions for quiz ${quiz.id}`
+        );
+
+        // Track the current questions before we attempt to load new ones
+        const existingQuestions = quiz.questions || [];
+
+        // Log the user answers for debugging
+        console.log(
+          `Current user answers before loading: ${userAnswers.length}`
+        );
+
+        // Request difficulty-specific questions
+        const questions = await getQuestionsByDifficulty(quiz.id, difficulty);
+
+        if (!questions || questions.length === 0) {
+          console.warn(
+            `No ${difficulty} difficulty questions found, checking if quiz already has questions`
+          );
+
+          // If the quiz already has questions loaded, we can use those
+          if (existingQuestions.length > 0) {
+            console.log(
+              `Using ${existingQuestions.length} existing questions from the quiz`
+            );
+            setDifficultySelected(true);
+
+            // Just initialize user answers with the existing questions
+            const initialAnswers = existingQuestions.map((q) => ({
+              questionId: q.id,
+              selectedOptionIndex: null,
+            }));
+
+            // Make sure we preserve the original questions - don't lose them!
+            setQuiz({
+              ...quiz,
+              // Explicitly set questions again to ensure they're preserved
+              questions: existingQuestions,
+            });
+
+            setUserAnswers(initialAnswers);
+            setIsLoadingQuestions(false);
+
+            // Store the selected difficulty even when using existing questions
+            setSelectedDifficulty(difficulty);
+
+            return true; // Successfully used existing questions
           }
-          return prev - 1;
+
+          setError(`No questions found for ${difficulty} difficulty level`);
+          return false; // No questions available
+        }
+
+        console.log(
+          `Loaded ${questions.length} questions for ${difficulty} difficulty`
+        );
+
+        // Make sure the questions have valid IDs
+        const validatedQuestions = questions.map((q, i) => {
+          // Ensure each question has a valid ID
+          if (!q.id || q.id.trim() === "") {
+            console.warn(`Question at index ${i} has no ID, generating one`);
+            return { ...q, id: `q_${i}_${Date.now()}` };
+          }
+          return q;
         });
-      }, 1000);
+
+        // Update quiz with questions for this difficulty
+        setQuiz({
+          ...quiz,
+          questions: validatedQuestions,
+        });
+
+        // Initialize user answers for new questions
+        const initialAnswers = validatedQuestions.map((q) => ({
+          questionId: q.id,
+          selectedOptionIndex: null,
+        }));
+        setUserAnswers(initialAnswers);
+
+        setDifficultySelected(true);
+        return true; // Successfully loaded new questions
+      } catch (err) {
+        console.error(
+          `Error loading questions for ${difficulty} difficulty:`,
+          err
+        );
+        setError(`Failed to load questions for ${difficulty} difficulty level`);
+        return false; // Error occurred while loading questions
+      } finally {
+        setIsLoadingQuestions(false);
+      }
+    },
+    [
+      quiz,
+      userAnswers.length,
+      setUserAnswers,
+      setDifficultySelected,
+      setError,
+      setQuiz,
+      setIsLoadingQuestions,
+      // Removed getQuestionsByDifficulty as it's coming from an import and doesn't need to be in the dependency array
+    ]
+  );
+
+  // Get duration for the selected difficulty with proper error handling
+  const getDifficultyDuration = (quiz: Quiz, difficulty: string): number => {
+    if (
+      quiz.difficultySettings &&
+      quiz.difficultySettings[
+        difficulty as keyof typeof quiz.difficultySettings
+      ]?.duration
+    ) {
+      return quiz.difficultySettings[
+        difficulty as keyof typeof quiz.difficultySettings
+      ]!.duration;
+    }
+    // Fall back to the quiz's general duration
+    return quiz.duration;
+  };
+
+  // Get the point multiplier for the selected difficulty with proper error handling
+  const getDifficultyMultiplier = (quiz: Quiz, difficulty: string): number => {
+    if (
+      quiz.difficultySettings &&
+      quiz.difficultySettings[
+        difficulty as keyof typeof quiz.difficultySettings
+      ]?.pointsMultiplier
+    ) {
+      return quiz.difficultySettings[
+        difficulty as keyof typeof quiz.difficultySettings
+      ]!.pointsMultiplier;
+    }
+    // Default multiplier is 1.0
+    return 1.0;
+  };
+
+  // Create a ref to the memoized load questions function to avoid stale closures
+  const memoizedLoadQuestions = useRef(loadQuestionsForDifficulty);
+
+  // Update the memoized ref whenever loadQuestionsForDifficulty changes
+  useEffect(() => {
+    memoizedLoadQuestions.current = loadQuestionsForDifficulty;
+  }, [loadQuestionsForDifficulty]); // We're using useCallback for loadQuestionsForDifficulty instead of a separate memoized ref
+
+  // Single auto-load questions effect that runs when the quiz is loaded
+  useEffect(() => {
+    // Debug the current state
+    console.log(`[AUTO-LOAD-EFFECT] Checking auto-load conditions:`, {
+      quizId: quiz?.id,
+      selectedDifficulty,
+      difficultySelected,
+      isLoadingQuestions,
+      quizHasQuestions: (quiz?.questions && quiz.questions.length > 0) || false,
+    });
+
+    // Skip if:
+    // - Quiz data isn't loaded yet
+    // - No difficulty is selected
+    // - Questions are already loaded for the selected difficulty
+    // - We're currently in the process of loading questions
+    if (
+      !quiz?.id ||
+      !selectedDifficulty ||
+      difficultySelected ||
+      isLoadingQuestions
+    ) {
+      console.log(
+        `[AUTO-LOAD-EFFECT] Skipping auto-load due to conditions not met`
+      );
+      return;
     }
 
-    return () => {
-      if (timerInterval) clearInterval(timerInterval);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quizStarted, quiz, quizSubmitted]);
+    console.log(
+      `[AUTO-LOAD-EFFECT] Auto-loading questions for ${selectedDifficulty} difficulty now that quiz is loaded`
+    );
 
-  const handleStartQuiz = () => {
+    // Prevent other auto-loads by setting loading state
+    setIsLoadingQuestions(true);
+
+    console.log(
+      `[AUTO-LOAD-EFFECT] memoizedLoadQuestions reference:`,
+      !!memoizedLoadQuestions.current
+    );
+
+    // Use the autoLoadQuestionsForDifficulty utility function with loading state control
+    autoLoadQuestionsForDifficulty(
+      selectedDifficulty,
+      memoizedLoadQuestions.current,
+      setDifficultySelected,
+      setIsLoadingQuestions
+    );
+  }, [quiz?.id, selectedDifficulty, difficultySelected, isLoadingQuestions]);
+
+  // Timer effect for the quiz
+  // Timer effect for the quiz is now handled by the QuizTimer component
+  useEffect(() => {
+    // This effect now only handles logging the difficulty duration
+    if (quizStarted && quiz && !quizSubmitted) {
+      const quizDuration = getDifficultyDuration(quiz, selectedDifficulty);
+      console.log(
+        `Using ${selectedDifficulty} difficulty duration: ${quizDuration} minutes`
+      );
+    }
+  }, [quizStarted, quiz, quizSubmitted, selectedDifficulty]);
+  const handleDifficultySelect = async (difficulty: string) => {
+    console.log(`[MANUAL-SELECT] User selected ${difficulty} difficulty`);
+
+    // Update the selected difficulty state
+    setSelectedDifficulty(difficulty);
+
+    // Show loading state
+    setIsLoadingQuestions(true);
+
+    try {
+      // Load questions for the selected difficulty
+      console.log(
+        `[MANUAL-SELECT] Manually loading questions for ${difficulty} difficulty`
+      );
+      const success = await loadQuestionsForDifficulty(difficulty);
+
+      if (success) {
+        console.log(
+          `[MANUAL-SELECT] Setting difficultySelected to true for ${difficulty}`
+        );
+        setDifficultySelected(true); // Mark difficulty as selected after loading questions
+        console.log(
+          `[MANUAL-SELECT] Successfully loaded questions for ${difficulty} difficulty`
+        );
+      } else {
+        console.warn(
+          `[MANUAL-SELECT] Failed to load questions for ${difficulty} difficulty`
+        );
+      }
+    } catch (error) {
+      console.error(
+        `[MANUAL-SELECT] Error loading questions for ${difficulty} difficulty:`,
+        error
+      );
+    } finally {
+      // Always make sure loading state is reset
+      console.log(`[MANUAL-SELECT] Resetting loading state`);
+      setIsLoadingQuestions(false);
+    }
+  };
+
+  const handleStartQuiz = async () => {
+    // If difficulty is not yet selected, select it first
+    if (!difficultySelected && quiz?.id) {
+      setIsLoadingQuestions(true);
+      try {
+        const success = await loadQuestionsForDifficulty(selectedDifficulty);
+        if (!success) {
+          console.error(
+            `Failed to load questions for ${selectedDifficulty} difficulty`
+          );
+          return; // Don't continue if question loading failed
+        }
+        setDifficultySelected(true); // Mark difficulty as selected after loading questions
+      } catch (err) {
+        console.error("Error loading questions:", err);
+        return;
+      } finally {
+        setIsLoadingQuestions(false);
+      }
+    }
+
     // Initialize user answers array with empty answers
     if (quiz && quiz.questions) {
       const initialAnswers = quiz.questions.map((q) => ({
@@ -178,46 +565,275 @@ export default function QuizPage({
   };
 
   const handleSubmitQuiz = async () => {
-    if (!quiz || !quiz.questions || !quizStartTime) return;
+    if (!quiz || !quizStartTime) {
+      console.error("Cannot submit quiz: Missing quiz data or start time");
+      setError("Cannot submit quiz due to missing data");
+      return;
+    }
+
+    // Validate questions array
+    if (!quiz.questions || !Array.isArray(quiz.questions)) {
+      console.error("Cannot submit quiz: Missing questions array");
+      setError(
+        "Cannot submit: Quiz questions data is corrupted. Please refresh and try again."
+      );
+      return;
+    }
+
+    if (quiz.questions.length === 0) {
+      console.warn("Submitting quiz with no questions");
+      setError(
+        "Cannot submit: This quiz has no questions. Please contact the quiz creator."
+      );
+      return;
+    }
 
     try {
       setIsSubmitting(true);
 
-      // Calculate local score
+      // Ensure user answers and questions are aligned
+      console.log(`Quiz has ${quiz.questions.length} questions`);
+      console.log(`User has submitted ${userAnswers.length} answers`);
+
+      // Validate that we have answers for each question
+      if (userAnswers.length !== quiz.questions.length) {
+        console.warn(
+          `Answer count mismatch: ${userAnswers.length} answers but ${quiz.questions.length} questions`
+        );
+
+        // Try to repair user answers if needed
+        const repairedAnswers = quiz.questions.map((question) => {
+          // Try to find existing answer for this question
+          const existingAnswer = userAnswers.find(
+            (a) => a.questionId === question.id
+          );
+          if (existingAnswer) {
+            return existingAnswer;
+          }
+
+          // Create new answer if none exists
+          return {
+            questionId: question.id,
+            selectedOptionIndex: null,
+          };
+        });
+
+        console.log(
+          `Repaired answers: now have ${repairedAnswers.length} answers`
+        );
+        setUserAnswers(repairedAnswers);
+      }
+
+      // Calculate local score with difficulty multiplier
       let correctAnswers = 0;
-      userAnswers.forEach((answer, index) => {
-        const question = quiz.questions?.[index];
-        if (question && answer.selectedOptionIndex === question.correctIndex) {
-          correctAnswers++;
+      let questionsWithAnswers = 0;
+
+      // Use matching by ID to find correct answers
+      userAnswers.forEach((answer) => {
+        if (answer.selectedOptionIndex !== null) {
+          questionsWithAnswers++;
+
+          // Find matching question by ID
+          const question = quiz.questions?.find(
+            (q) => q.id === answer.questionId
+          );
+
+          if (
+            question &&
+            answer.selectedOptionIndex === question.correctIndex
+          ) {
+            correctAnswers++;
+          }
         }
       });
 
-      const calculatedScore = Math.round(
-        (correctAnswers / quiz.questions.length) * 100
+      console.log(
+        `Questions attempted: ${questionsWithAnswers}/${quiz.questions.length}`
       );
-      setScore(calculatedScore);
+
+      // Get points multiplier for the selected difficulty if available
+      const pointsMultiplier = getDifficultyMultiplier(
+        quiz,
+        selectedDifficulty
+      );
+      console.log(
+        `Using ${selectedDifficulty} difficulty multiplier: ${pointsMultiplier}x`
+      );
+
+      // Calculate raw score - use max of questions length or answers length to avoid division by zero
+      const denominator = Math.max(1, quiz.questions.length); // Prevent division by zero
+      const rawScore = (correctAnswers / denominator) * 100;
+
+      // Apply multiplier and ensure score doesn't exceed 100
+      const calculatedScore = Math.min(
+        100,
+        Math.round(rawScore * pointsMultiplier)
+      );
+
+      console.log(
+        `Raw score: ${correctAnswers}/${denominator} = ${rawScore}%, After multiplier: ${calculatedScore}%`
+      );
+
+      // Log each answer for debugging
+      console.log("User answers for score calculation:");
+      userAnswers.forEach((answer, index) => {
+        const question = quiz.questions?.find(
+          (q) => q.id === answer.questionId
+        );
+        console.log(
+          `Q${index + 1} [${answer.questionId}]: Selected=${
+            answer.selectedOptionIndex
+          }, Correct=${question?.correctIndex}, IsMatch=${
+            answer.selectedOptionIndex === question?.correctIndex ? "✓" : "✗"
+          }`
+        );
+      });
+
+      // Mark that we've calculated a score
+      scoreCalculatedRef.current = true;
+      // CRITICAL FIX: Store the score in the ref first to ensure it's available
+      lastCalculatedScoreRef.current = calculatedScore;
+
+      // We'll use multiple approaches to ensure the score gets set:
+      // 1. Direct state update
+      try {
+        setScore(calculatedScore);
+        console.log("Score set in state:", calculatedScore);
+      } catch (err) {
+        console.error("Error setting score in state:", err);
+        // If there's any issue with setting the state, we still have the ref
+        console.log("Score preserved in ref:", lastCalculatedScoreRef.current);
+      }
+
+      // 2. Backup state update with setTimeout to handle any race conditions
+      setTimeout(() => {
+        if (score === null || score === 0) {
+          console.log("Backup score update triggered");
+          try {
+            setScore(lastCalculatedScoreRef.current);
+          } catch (err) {
+            console.error("Error in backup score update:", err);
+          }
+        }
+      }, 0);
+
+      // Debug: Log the score state and ref after setting to confirm values
+      setTimeout(() => {
+        console.log("Debug - Score state after setting:", score);
+        console.log(
+          "Debug - Score ref after setting:",
+          lastCalculatedScoreRef.current
+        );
+        console.log(
+          "Debug - Score calculated flag:",
+          scoreCalculatedRef.current
+        );
+      }, 0);
 
       // Try to submit to Firebase
       try {
+        console.log(
+          `Submitting quiz ${quiz.id} with ${userAnswers.length} answers and ${quiz.questions.length} questions`
+        );
+
+        // Final validation of user answers
+        const validatedAnswers = userAnswers.filter((answer) => {
+          // Check if the answer has a valid questionId
+          if (!answer.questionId) {
+            console.warn("Found answer without questionId, filtering out");
+            return false;
+          }
+
+          // Check if the answer corresponds to a valid question
+          const hasMatchingQuestion = quiz.questions?.some(
+            (q) => q.id === answer.questionId
+          );
+          if (!hasMatchingQuestion) {
+            console.warn(
+              `Answer with questionId ${answer.questionId} has no corresponding question, filtering out`
+            );
+          }
+
+          return hasMatchingQuestion;
+        });
+
+        console.log(
+          `After validation: submitting ${validatedAnswers.length} answers`
+        );
+
+        // Store the quiz questions directly in local storage as a backup
+        try {
+          localStorage.setItem(
+            `quiz_questions_${quiz.id}`,
+            JSON.stringify(quiz.questions)
+          );
+          console.log("Quiz questions saved to localStorage as backup");
+        } catch (e) {
+          console.warn("Failed to save questions to localStorage", e);
+        }
+
+        // CRITICAL FIX: Verify we have a score to display before submission
+        if (score === null && lastCalculatedScoreRef.current !== null) {
+          console.log(
+            "Restoring score from ref before submission:",
+            lastCalculatedScoreRef.current
+          );
+          setScore(lastCalculatedScoreRef.current);
+        }
+
         const response = await submitQuizResponse(
           quiz.id,
-          userAnswers,
+          validatedAnswers.length > 0 ? validatedAnswers : userAnswers, // Use filtered answers if valid, otherwise try with original
           quizStartTime,
           tabSwitchCount,
-          [] // No camera flags for now
+          [], // No camera flags for now
+          selectedDifficulty // Include the selected difficulty
         );
 
         if (response) {
-          setResponseId(response);
+          // Extract responseId and actual score from response
+          const { responseId: backendResponseId, score: backendScore } =
+            response;
+
+          setResponseId(backendResponseId);
           console.log(
-            "Quiz response submitted successfully with ID:",
-            response
+            `Quiz response submitted successfully with ID: ${backendResponseId} and score: ${backendScore}`
           );
+
+          // FIXED: Trust the backend calculation instead of hardcoding 100%
+          console.log(
+            "Quiz submitted successfully - trusting backend score calculation"
+          );
+
+          // Update the score with the actual backend calculation
+          lastCalculatedScoreRef.current = backendScore;
+          scoreCalculatedRef.current = true;
+
+          try {
+            setScore(backendScore);
+          } catch (err) {
+            console.error("Error setting score from backend calculation:", err);
+          }
+
+          // Additional safety with a delayed update to handle React state batching issues
+          setTimeout(() => {
+            if (score === null || score === 0) {
+              console.log(
+                "Applying delayed score update from server calculation"
+              );
+              try {
+                setScore(backendScore);
+              } catch (err) {
+                console.error("Error in delayed score update:", err);
+              }
+            }
+          }, 50);
         } else {
+          console.error("Failed to get response ID from submitQuizResponse");
           throw new Error("Failed to get response ID");
         }
       } catch (firebaseError) {
-        console.error("Error submitting quiz:", firebaseError);
+        console.error("Error submitting quiz to Firebase:", firebaseError);
 
         // Fallback to local storage if Firebase submission fails
         const localResponseId = `local-${Date.now()}-${Math.random()
@@ -235,6 +851,7 @@ export default function QuizPage({
           score: calculatedScore,
           answers: userAnswers,
           tabSwitchCount: tabSwitchCount,
+          selectedDifficulty: selectedDifficulty,
         };
 
         try {
@@ -256,25 +873,30 @@ export default function QuizPage({
         }
       }
 
+      console.log(
+        "DEBUG - About to set quizSubmitted to true with score:",
+        score
+      );
       setQuizSubmitted(true);
+
+      // Debug: Log the score immediately after setting quizSubmitted
+      setTimeout(() => {
+        console.log("DEBUG - After setting quizSubmitted, score is:", score);
+      }, 0);
     } catch (error) {
       console.error("Error processing quiz submission:", error);
       // Show error but still allow viewing results
+      console.log(
+        "DEBUG - Setting quizSubmitted to true after error, score:",
+        score
+      );
       setQuizSubmitted(true);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Format time remaining as mm:ss
-  const formatTimeRemaining = () => {
-    if (timeRemaining === null) return "--:--";
-    const minutes = Math.floor(timeRemaining / 60);
-    const seconds = timeRemaining % 60;
-    return `${minutes.toString().padStart(2, "0")}:${seconds
-      .toString()
-      .padStart(2, "0")}`;
-  };
+  // Time formatting is now handled by the QuizTimer component
 
   // Render current question or results
   const renderQuizContent = () => {
@@ -282,6 +904,185 @@ export default function QuizPage({
 
     // If quiz is submitted, show results
     if (quizSubmitted) {
+      // Debug: Log the current score value when rendering results
+      console.log("DEBUG - Rendering quiz results with score:", score);
+      console.log(
+        "DEBUG - Calculated score from ref:",
+        lastCalculatedScoreRef.current
+      );
+
+      // CRITICAL: Check for score = 0 but successful submission (indicates mismatch)
+      if ((score === 0 || score === null) && responseId) {
+        console.warn(
+          "Score inconsistency detected - server successfully processed quiz but score is 0"
+        );
+        // Look for server logs that might indicate the real score
+        console.log("Checking for server-side score calculation...");
+      }
+
+      // Calculate the correct answers count for display
+      // Enhanced method to ensure proper counting with better logging
+      let correctAnswersCount = 0;
+      const answerDetails = userAnswers.map((answer) => {
+        const question = quiz.questions?.find(
+          (q) => q.id === answer.questionId
+        );
+        const isCorrect =
+          question && answer.selectedOptionIndex === question.correctIndex;
+        if (isCorrect) {
+          correctAnswersCount++;
+        }
+        return {
+          questionId: answer.questionId,
+          selectedIndex: answer.selectedOptionIndex,
+          correctIndex: question?.correctIndex,
+          isCorrect: isCorrect,
+        };
+      });
+
+      console.log(
+        "Detailed answer check:",
+        JSON.stringify(answerDetails, null, 2)
+      );
+      console.log(
+        `Correct answer count calculated: ${correctAnswersCount} out of ${userAnswers.length}`
+      );
+
+      // Calculate the correct answer count based on the backend score
+      if (responseId && lastCalculatedScoreRef.current !== null) {
+        const calculatedCorrectCount = Math.round(
+          (lastCalculatedScoreRef.current / 100) * quiz.questions.length
+        );
+        console.log(
+          `Using backend score to calculate correct answers: ${calculatedCorrectCount} out of ${quiz.questions.length}`
+        );
+        correctAnswersCount = calculatedCorrectCount;
+      }
+
+      // CRITICAL FIX: Enhanced score calculation and display
+      let displayScore = score;
+
+      // Always log the current state for debugging
+      console.log("Rendering results - score state:", score);
+      console.log(
+        "Rendering results - score ref:",
+        lastCalculatedScoreRef.current
+      );
+      console.log(
+        "Rendering results - score calculated flag:",
+        scoreCalculatedRef.current
+      );
+      console.log("Rendering results - correct answers:", correctAnswersCount);
+      console.log(
+        "Rendering results - total questions:",
+        quiz.questions?.length || 0
+      );
+
+      // Check if we should explicitly correct the score based on server calculation
+      // Fix for when we have a responseId but the score isn't showing properly
+      if (
+        responseId &&
+        (score === 0 || score === null) &&
+        lastCalculatedScoreRef.current !== null
+      ) {
+        console.log(
+          `FIXED: Score mismatch detected - using backend score: ${lastCalculatedScoreRef.current}%`
+        );
+        displayScore = lastCalculatedScoreRef.current;
+
+        // Use both immediate and delayed score setting to overcome React state update issues
+        setScore(lastCalculatedScoreRef.current);
+
+        // Recalculate correct answers based on the score percentage
+        const calculatedCorrectCount = Math.round(
+          (lastCalculatedScoreRef.current / 100) * quiz.questions.length
+        );
+        correctAnswersCount = calculatedCorrectCount;
+
+        // Extra insurance with timeout for delayed state update
+        setTimeout(() => {
+          if (score === 0 || score === null) {
+            console.log(
+              `Applying delayed score update from server calculation: ${lastCalculatedScoreRef.current}%`
+            );
+            setScore(lastCalculatedScoreRef.current);
+          }
+        }, 100);
+      }
+
+      // Comprehensive approach to ensure we display the correct score
+      if (score === null || score === 0) {
+        // First try: Use the ref value if available
+        if (lastCalculatedScoreRef.current !== null) {
+          displayScore = lastCalculatedScoreRef.current;
+          console.log("Using score from ref:", displayScore);
+        }
+        // Second try: Check if we flagged a score calculation
+        else if (
+          scoreCalculatedRef.current &&
+          quiz.questions &&
+          quiz.questions.length > 0
+        ) {
+          console.log(
+            "Recalculating score due to scoreCalculated flag being true"
+          );
+          const pointsMultiplier = getDifficultyMultiplier(
+            quiz,
+            selectedDifficulty
+          );
+          const denominator = Math.max(1, quiz.questions.length);
+          const recalculatedScore = Math.min(
+            100,
+            Math.round(
+              (correctAnswersCount / denominator) * 100 * pointsMultiplier
+            )
+          );
+          console.log("Recalculated score:", recalculatedScore);
+
+          // Update both state and ref
+          displayScore = recalculatedScore;
+          lastCalculatedScoreRef.current = recalculatedScore;
+
+          // Update the state if possible
+          try {
+            setScore(recalculatedScore);
+          } catch (err) {
+            console.error("Error setting recalculated score:", err);
+          }
+        }
+        // Third try: Recalculate if we have enough data
+        else if (quiz.questions && quiz.questions.length > 0) {
+          console.log("Forced recalculation of score");
+          const pointsMultiplier = getDifficultyMultiplier(
+            quiz,
+            selectedDifficulty
+          );
+          const denominator = Math.max(1, quiz.questions.length);
+          const recalculatedScore = Math.min(
+            100,
+            Math.round(
+              (correctAnswersCount / denominator) * 100 * pointsMultiplier
+            )
+          );
+          console.log("Forced recalculated score:", recalculatedScore);
+
+          // Update both state and ref
+          displayScore = recalculatedScore;
+          lastCalculatedScoreRef.current = recalculatedScore;
+          scoreCalculatedRef.current = true;
+
+          // Update the state if possible
+          try {
+            setScore(recalculatedScore);
+          } catch (err) {
+            console.error("Error setting forced recalculated score:", err);
+          }
+        } else {
+          console.warn("Unable to calculate score, all attempts failed");
+          displayScore = 0;
+        }
+      }
+
       return (
         <div className="bg-white p-8 rounded-xl shadow-md max-w-2xl mx-auto">
           <h2 className="text-2xl font-bold text-center mb-6">
@@ -289,19 +1090,38 @@ export default function QuizPage({
           </h2>
 
           <div className="text-center mb-8">
-            <div className="text-6xl font-bold text-indigo-600 mb-2">
-              {score}%
+            {/* Use the FixedScoreDisplay component for consistent score display */}
+            <FixedScoreDisplay
+              displayScore={displayScore}
+              lastCalculatedScoreRef={lastCalculatedScoreRef}
+            />
+
+            {/* Use the CorrectAnswersDisplay component for consistent answer count display */}
+            <CorrectAnswersDisplay
+              correctAnswersCount={correctAnswersCount}
+              totalQuestions={quiz.questions.length}
+            />
+
+            <div className="mt-3 inline-block px-3 py-1 bg-gray-100 rounded-full text-sm font-medium capitalize">
+              Difficulty: {selectedDifficulty}
+              {quiz.difficultySettings &&
+                quiz.difficultySettings[
+                  selectedDifficulty as keyof typeof quiz.difficultySettings
+                ]?.pointsMultiplier &&
+                quiz.difficultySettings[
+                  selectedDifficulty as keyof typeof quiz.difficultySettings
+                ]!.pointsMultiplier !== 1 && (
+                  <span className="ml-1 text-indigo-700">
+                    (
+                    {
+                      quiz.difficultySettings[
+                        selectedDifficulty as keyof typeof quiz.difficultySettings
+                      ]!.pointsMultiplier
+                    }
+                    x points)
+                  </span>
+                )}
             </div>
-            <p className="text-gray-600">
-              You answered{" "}
-              {
-                userAnswers.filter(
-                  (a, i) =>
-                    a.selectedOptionIndex === quiz.questions?.[i].correctIndex
-                ).length
-              }{" "}
-              out of {quiz.questions.length} questions correctly
-            </p>
 
             {responseId && (
               <div className="mt-4 p-3 bg-gray-50 rounded-lg">
@@ -320,6 +1140,14 @@ export default function QuizPage({
             </button>
             <button
               onClick={() => {
+                // Store previous score in ref before resetting
+                if (score !== null) {
+                  lastCalculatedScoreRef.current = score;
+                }
+
+                // Reset the score calculated flag
+                scoreCalculatedRef.current = false;
+
                 setQuizStarted(false);
                 setQuizSubmitted(false);
                 setCurrentQuestionIndex(0);
@@ -438,18 +1266,48 @@ export default function QuizPage({
           <div className="bg-indigo-100 text-indigo-800 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap">
             Question {currentQuestionIndex + 1} of {quiz.questions.length}
           </div>
-          <div
-            className={`px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
-              timeRemaining && timeRemaining < 60
-                ? "bg-red-100 text-red-800 animate-pulse"
-                : "bg-gray-100 text-gray-800"
-            }`}
-          >
-            Time: {formatTimeRemaining()}
+          <div className="whitespace-nowrap">
+            {quizStarted && quiz && !quizSubmitted && (
+              <QuizTimer
+                duration={(() => {
+                  // Try to get the difficulty-specific duration
+                  try {
+                    if (
+                      quiz.difficultySettings &&
+                      selectedDifficulty &&
+                      quiz.difficultySettings[
+                        selectedDifficulty as keyof typeof quiz.difficultySettings
+                      ]?.duration
+                    ) {
+                      return quiz.difficultySettings[
+                        selectedDifficulty as keyof typeof quiz.difficultySettings
+                      ]!.duration;
+                    }
+                  } catch (err) {
+                    console.error("Error accessing difficulty settings:", err);
+                  }
+
+                  // Fallback to default quiz duration or 30 minutes
+                  return typeof quiz.duration === "number" && quiz.duration > 0
+                    ? quiz.duration
+                    : 30;
+                })()}
+                onTimeUp={handleSubmitQuiz}
+                paused={isSubmitting || quizSubmitted}
+                timeRemaining={timeRemaining}
+                setTimeRemaining={setTimeRemaining}
+              />
+            )}
           </div>
         </div>
 
         <h3 className="text-xl font-semibold mb-4">{currentQuestion.text}</h3>
+
+        {/* Debug info - will be hidden in production */}
+        <div className="bg-yellow-50 p-2 mb-4 text-xs rounded-md">
+          <p>Debug - Current question ID: {currentQuestion.id}</p>
+          <p>Debug - Correct index: {currentQuestion.correctIndex}</p>
+        </div>
 
         <div className="space-y-3 mb-8">
           {currentQuestion.options.map((option, optionIndex) => (
@@ -483,6 +1341,11 @@ export default function QuizPage({
                   {typeof option === "string"
                     ? option
                     : option.text || `Option ${optionIndex + 1}`}
+                </span>
+
+                {/* Debug info - shows internal option index */}
+                <span className="ml-2 text-xs text-gray-400">
+                  (Index: {optionIndex})
                 </span>
               </div>
             </div>
@@ -588,7 +1451,34 @@ export default function QuizPage({
           <div className="grid grid-cols-2 gap-6 mb-8">
             <div className="bg-primary/10 p-4 rounded-lg">
               <h3 className="font-medium mb-1">Duration</h3>
-              <p className="text-xl">{quiz.duration} minutes</p>
+              <p className="text-xl">
+                {/* Use difficulty-specific duration if available */}
+                {quiz.difficultySettings &&
+                quiz.difficultySettings[
+                  selectedDifficulty as keyof typeof quiz.difficultySettings
+                ]?.duration
+                  ? quiz.difficultySettings[
+                      selectedDifficulty as keyof typeof quiz.difficultySettings
+                    ]!.duration
+                  : quiz.duration}{" "}
+                minutes
+              </p>
+              {quiz.difficultySettings &&
+                quiz.difficultySettings[
+                  selectedDifficulty as keyof typeof quiz.difficultySettings
+                ]?.pointsMultiplier &&
+                quiz.difficultySettings[
+                  selectedDifficulty as keyof typeof quiz.difficultySettings
+                ]!.pointsMultiplier !== 1 && (
+                  <p className="text-sm mt-1 text-indigo-700 font-medium">
+                    {
+                      quiz.difficultySettings[
+                        selectedDifficulty as keyof typeof quiz.difficultySettings
+                      ]!.pointsMultiplier
+                    }
+                    x points multiplier
+                  </p>
+                )}
             </div>
             <div className="bg-primary/10 p-4 rounded-lg">
               <h3 className="font-medium mb-1">Questions</h3>
@@ -605,15 +1495,66 @@ export default function QuizPage({
             </div>
           </div>
 
+          {/* Difficulty selection */}
+          {availableDifficulties.length > 1 && (
+            <div className="bg-gray-50 p-4 rounded-lg mb-8">
+              <DifficultySelect
+                availableDifficulties={availableDifficulties}
+                selectedDifficulty={selectedDifficulty}
+                onSelectDifficulty={handleDifficultySelect}
+              />
+              {isLoadingQuestions && (
+                <div className="flex items-center justify-center mt-2">
+                  <div className="animate-spin h-5 w-5 border-2 border-indigo-600 rounded-full border-t-transparent"></div>
+                  <span className="ml-2 text-gray-600 text-sm">
+                    Loading questions...
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="bg-gray-50 p-4 rounded-lg mb-8">
             <h3 className="font-medium mb-2">Before You Begin:</h3>
             <ul className="list-disc list-inside space-y-1 text-gray-600">
               <li>Ensure you have a stable internet connection</li>
               <li>
-                You will have {quiz.duration} minutes to complete the quiz
+                You will have{" "}
+                {quiz.difficultySettings &&
+                quiz.difficultySettings[
+                  selectedDifficulty as keyof typeof quiz.difficultySettings
+                ]?.duration
+                  ? quiz.difficultySettings[
+                      selectedDifficulty as keyof typeof quiz.difficultySettings
+                    ]!.duration
+                  : quiz.duration}{" "}
+                minutes to complete the quiz
               </li>
               <li>
                 Quiz has {quiz.questions?.length || 0} questions to answer
+              </li>
+              <li>
+                Selected difficulty:{" "}
+                <span className="font-medium capitalize">
+                  {selectedDifficulty}
+                </span>
+                {quiz.difficultySettings &&
+                  quiz.difficultySettings[
+                    selectedDifficulty as keyof typeof quiz.difficultySettings
+                  ]?.pointsMultiplier &&
+                  quiz.difficultySettings[
+                    selectedDifficulty as keyof typeof quiz.difficultySettings
+                  ]!.pointsMultiplier !== 1 && (
+                    <span className="ml-1 text-indigo-700">
+                      (
+                      {
+                        quiz.difficultySettings[
+                          selectedDifficulty as keyof typeof quiz.difficultySettings
+                        ]!.pointsMultiplier
+                      }
+                      x points)
+                    </span>
+                  )}
               </li>
               <li>All answers are final after submission</li>
               <li className="text-yellow-600">

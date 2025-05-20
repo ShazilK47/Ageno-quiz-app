@@ -8,6 +8,7 @@ import { handleFirebaseError } from "@/firebase/utils";
 import AdminProtected from "@/components/AdminProtected";
 import QuizForm from "@/components/quiz/QuizForm";
 import Header from "@/components/Header";
+import { getQuestionsByDifficulty } from "@/firebase/quizDifficulty";
 
 // Define the QuizQuestion type
 interface QuizQuestion {
@@ -32,6 +33,8 @@ interface Quiz {
   code: string;
   questions: QuizQuestion[];
   autoCheck?: boolean;
+  availableDifficulties?: string[];
+  requiresAccessCode?: boolean;
 }
 
 export default function EditQuizPage() {
@@ -60,6 +63,37 @@ export default function EditQuizPage() {
       }
 
       const quizData = quizSnapshot.data();
+
+      // Get available difficulty levels from the quiz data
+      const availableDifficulties = quizData.availableDifficulties || [
+        "easy",
+        "medium",
+        "hard",
+      ];
+
+      // Load questions for each difficulty level
+      let allQuestions: QuizQuestion[] = [];
+
+      try {
+        // Try to load questions by difficulty from the subcollections
+        for (const difficulty of availableDifficulties) {
+          const difficultyQuestions = await getQuestionsByDifficulty(
+            quizId,
+            difficulty
+          );
+          allQuestions = [...allQuestions, ...difficultyQuestions];
+        }
+
+        console.log(`Loaded ${allQuestions.length} questions by difficulty`);
+      } catch (err) {
+        console.error(
+          "Error loading questions by difficulty, falling back to legacy format",
+          err
+        );
+        // Fall back to the old questions array if there was an error
+        allQuestions = quizData.questions || [];
+      }
+
       setQuiz({
         id: quizSnapshot.id,
         title: quizData.title,
@@ -67,8 +101,10 @@ export default function EditQuizPage() {
         active: quizData.active || false,
         timeLimit: quizData.timeLimit || 30,
         code: quizData.code || "",
-        questions: quizData.questions || [],
+        questions: allQuestions,
         autoCheck: quizData.autoCheck,
+        availableDifficulties: availableDifficulties,
+        requiresAccessCode: quizData.requiresAccessCode,
       });
     } catch (err) {
       const formattedError = handleFirebaseError(err);
