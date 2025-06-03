@@ -9,8 +9,14 @@ import {
   getDocs,
   getDoc,
   doc,
+  where,
+  Timestamp,
 } from "firebase/firestore";
 import { db } from "@/firebase/client";
+import { useAuth } from "@/contexts/auth-context";
+import LeaderboardFilters from "./LeaderboardFilters";
+import UserRank from "./UserRank";
+import TopPerformers from "./TopPerformers";
 
 type LeaderboardEntry = {
   id: string;
@@ -21,18 +27,33 @@ type LeaderboardEntry = {
   timeTaken: number; // in seconds
   rank?: number;
   quizId?: string;
+  difficulty?: string;
+  userId?: string;
+  normalizedScore?: number; // Score adjusted for difficulty
+};
+
+// Difficulty multipliers for score normalization
+const DIFFICULTY_MULTIPLIERS = {
+  basic: 1.0,
+  medium: 1.3,
+  hard: 1.6,
+  "": 1.0, // Default
 };
 
 const LeaderboardPage = () => {
+  const { user } = useAuth();
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>(
     []
   );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeFrame, setTimeFrame] = useState<"all" | "week" | "month">("all");
-  // Removed unused state variable
+  const [category, setCategory] = useState<string>("");
+  const [difficulty, setDifficulty] = useState<string>("");
+  const [currentUserEntry, setCurrentUserEntry] =
+    useState<LeaderboardEntry | null>(null);
 
-  // Add a state for user info cache
+  // Cache for user names and quiz titles
   const [userInfoCache, setUserInfoCache] = useState<Record<string, string>>(
     {}
   );
@@ -40,7 +61,24 @@ const LeaderboardPage = () => {
     {}
   );
 
-  // New function to fetch user display names wrapped in useCallback
+  // Handle filter changes
+  const handleFilterChange = useCallback(
+    (type: "timeFrame" | "category" | "difficulty", value: string) => {
+      switch (type) {
+        case "timeFrame":
+          setTimeFrame(value as "all" | "week" | "month");
+          break;
+        case "category":
+          setCategory(value);
+          break;
+        case "difficulty":
+          setDifficulty(value);
+          break;
+      }
+    },
+    []
+  );
+  // Fetch user display names
   const fetchUserInfo = useCallback(
     async (userIds: string[]) => {
       try {
@@ -51,11 +89,29 @@ const LeaderboardPage = () => {
 
         const userInfo: Record<string, string> = {};
 
-        // Could be replaced with a batch get if you have a users collection
-        // For now, we'll just use user IDs as display names
-        uniqueIds.forEach((id) => {
-          userInfo[id] = `User ${id.substring(0, 6)}`;
-        });
+        // Fetch actual user data from Firestore's users collection
+        for (const userId of uniqueIds) {
+          try {
+            const userDoc = await getDoc(doc(db, "users", userId));
+
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              // Use displayName from Firestore, or email prefix as fallback,
+              // or User ID as last resort
+              userInfo[userId] =
+                userData.displayName ||
+                (userData.email
+                  ? userData.email.split("@")[0]
+                  : `User ${userId.substring(0, 6)}`);
+            } else {
+              // Fallback if user document doesn't exist
+              userInfo[userId] = `User ${userId.substring(0, 6)}`;
+            }
+          } catch (err) {
+            console.error(`Error fetching user ${userId}:`, err);
+            userInfo[userId] = `User ${userId.substring(0, 6)}`;
+          }
+        }
 
         setUserInfoCache((prev) => ({ ...prev, ...userInfo }));
       } catch (error) {
@@ -65,7 +121,7 @@ const LeaderboardPage = () => {
     [userInfoCache]
   );
 
-  // New function to fetch quiz titles - improved version wrapped in useCallback
+  // Fetch quiz titles
   const fetchQuizInfo = useCallback(
     async (quizIds: string[]) => {
       try {
@@ -74,26 +130,20 @@ const LeaderboardPage = () => {
         );
         if (uniqueIds.length === 0) return;
 
-        console.log("Fetching quiz info for IDs:", uniqueIds);
-
-        // Fetch quiz titles from Firestore
         const quizInfo: Record<string, string> = {};
 
-        // Make one request per quiz ID for now
+        // Make one request per quiz ID
         for (const quizId of uniqueIds) {
           try {
             if (!quizId) continue;
 
-            console.log("Fetching quiz title for ID:", quizId);
             const quizDoc = await getDoc(doc(db, "quizzes", quizId));
 
             if (quizDoc.exists()) {
               const quizData = quizDoc.data();
-              console.log("Quiz data retrieved:", quizData);
               quizInfo[quizId] =
                 quizData.title || `Quiz ${quizId.substring(0, 6)}`;
             } else {
-              console.log("Quiz document does not exist:", quizId);
               quizInfo[quizId] = `Quiz ${quizId.substring(0, 6)}`;
             }
           } catch (err) {
@@ -102,7 +152,6 @@ const LeaderboardPage = () => {
           }
         }
 
-        console.log("Quiz info retrieved:", quizInfo);
         setQuizInfoCache((prev) => ({ ...prev, ...quizInfo }));
       } catch (error) {
         console.error("Error fetching quiz info:", error);
@@ -115,16 +164,12 @@ const LeaderboardPage = () => {
     const fetchLeaderboardData = async () => {
       try {
         setIsLoading(true);
-        setError(null);
-
-        console.log("Attempting to fetch leaderboard data...");
-
-        // Use 'responses' collection instead of 'quizResponses'
+        setError(null); // Use 'responses' collection
         const responsesRef = collection(db, "responses");
+        const queryConstraints: Array<ReturnType<typeof where>> = [];
 
-        // Filter by time frame if needed
-        let leaderboardQuery;
-        if (timeFrame === "week" || timeFrame === "month") {
+        // Apply time frame filter
+        if (timeFrame !== "all") {
           const dateLimit = new Date();
           if (timeFrame === "week") {
             dateLimit.setDate(dateLimit.getDate() - 7);
@@ -132,29 +177,30 @@ const LeaderboardPage = () => {
             dateLimit.setMonth(dateLimit.getMonth() - 1);
           }
 
-          leaderboardQuery = query(
-            responsesRef,
-            // where("submittedAt", ">=", dateLimit),
-            orderBy("score", "desc"), // First order by score
-            limit(100) // Fetch more entries to sort by time later
-          );
-        } else {
-          leaderboardQuery = query(
-            responsesRef,
-            orderBy("score", "desc"), // First order by score
-            limit(100) // Fetch more entries to sort by time later
+          queryConstraints.push(
+            where("submittedAt", ">=", Timestamp.fromDate(dateLimit))
           );
         }
 
-        console.log("Executing query...");
+        // Apply category filter
+        if (category) {
+          queryConstraints.push(where("quizId", "==", category));
+        }
+
+        // Apply difficulty filter - may need to adjust based on your data model
+        if (difficulty) {
+          queryConstraints.push(where("selectedDifficulty", "==", difficulty));
+        }
+
+        // Create the final query with all filters
+        const leaderboardQuery = query(
+          responsesRef,
+          ...queryConstraints,
+          orderBy("score", "desc"),
+          limit(100) // Fetch more entries to sort by time later
+        );
+
         const querySnapshot = await getDocs(leaderboardQuery);
-        console.log(`Query returned ${querySnapshot.size} documents`);
-
-        // Debug the first document if available
-        if (querySnapshot.size > 0) {
-          const firstDoc = querySnapshot.docs[0];
-          console.log("Sample document data:", firstDoc.data());
-        }
 
         const entries: LeaderboardEntry[] = [];
         const userIds: string[] = [];
@@ -177,112 +223,172 @@ const LeaderboardPage = () => {
                 )
               : 0;
 
-          // Map the fields from your actual response collection to leaderboard entries
+          // Get the difficulty level with a default of empty string
+          const difficultyLevel = data.selectedDifficulty || "";
+
+          // Calculate normalized score based on difficulty
+          const rawScore = typeof data.score === "number" ? data.score : 0;
+          const multiplier =
+            DIFFICULTY_MULTIPLIERS[
+              difficultyLevel as keyof typeof DIFFICULTY_MULTIPLIERS
+            ] || 1.0;
+          const normalizedScore = rawScore * multiplier;
+
+          // Map the fields to leaderboard entries
           entries.push({
             id: doc.id,
             username: data.userId || "Anonymous User",
             quizTitle: data.quizId || "Unknown Quiz",
-            score: typeof data.score === "number" ? data.score : 0,
+            score: rawScore,
             completedAt: data.submittedAt?.toDate() || new Date(),
             timeTaken: timeTaken,
             quizId: data.quizId || "",
-            // Rank will be assigned after sorting
+            difficulty: difficultyLevel,
+            userId: data.userId,
+            normalizedScore: normalizedScore,
           });
         });
 
-        // First fetch quiz information
+        // Fetch quiz and user info
         await fetchQuizInfo(quizIds);
         await fetchUserInfo(userIds);
 
-        // Group entries by quiz ID to rank within each quiz type
-        const entriesByQuiz: Record<string, LeaderboardEntry[]> = {};
+        // Create aggregated user rankings when showing all quizzes (no specific quiz category selected)
+        let sortedEntries: LeaderboardEntry[] = [];
 
-        entries.forEach((entry) => {
-          const quizId = entry.quizId || "unknown";
-          if (!entriesByQuiz[quizId]) {
-            entriesByQuiz[quizId] = [];
-          }
-          entriesByQuiz[quizId].push(entry);
-        });
+        if (!category) {
+          // Global leaderboard - aggregate by user
+          const userScores: Record<
+            string,
+            {
+              userId: string;
+              totalNormalizedScore: number;
+              quizCount: number;
+              bestTime: number;
+              latestCompletion: Date;
+              entries: LeaderboardEntry[];
+            }
+          > = {};
 
-        // For each quiz, sort by score and then by time taken
-        Object.keys(entriesByQuiz).forEach((quizId) => {
-          entriesByQuiz[quizId].sort((a, b) => {
-            // First sort by score (highest first)
-            if (b.score !== a.score) {
-              return b.score - a.score;
+          // Group and calculate combined metrics by user
+          entries.forEach((entry) => {
+            if (!entry.userId) return;
+
+            if (!userScores[entry.userId]) {
+              userScores[entry.userId] = {
+                userId: entry.userId,
+                totalNormalizedScore: 0,
+                quizCount: 0,
+                bestTime: Infinity,
+                latestCompletion: new Date(0),
+                entries: [],
+              };
+            }
+
+            // Add this entry's score to user's total
+            userScores[entry.userId].totalNormalizedScore +=
+              entry.normalizedScore || 0;
+            userScores[entry.userId].quizCount += 1;
+
+            // Track user's best time (lowest value)
+            if (entry.timeTaken < userScores[entry.userId].bestTime) {
+              userScores[entry.userId].bestTime = entry.timeTaken;
+            }
+
+            // Track user's latest completion
+            if (entry.completedAt > userScores[entry.userId].latestCompletion) {
+              userScores[entry.userId].latestCompletion = entry.completedAt;
+            }
+
+            // Store the entry
+            userScores[entry.userId].entries.push(entry);
+          });
+
+          // Create aggregated entries for global leaderboard
+          const aggregatedEntries: LeaderboardEntry[] = Object.values(
+            userScores
+          ).map((userData) => {
+            // Use the most recent entry as a base
+            const mostRecentEntry = userData.entries.sort(
+              (a, b) => b.completedAt.getTime() - a.completedAt.getTime()
+            )[0];
+
+            // Create a combined entry with aggregate scores
+            return {
+              ...mostRecentEntry,
+              id: `global-${userData.userId}`,
+              quizTitle: `${userData.quizCount} quiz${
+                userData.quizCount !== 1 ? "zes" : ""
+              } completed`,
+              score: Math.round(
+                userData.totalNormalizedScore / userData.quizCount
+              ),
+              normalizedScore: userData.totalNormalizedScore,
+              timeTaken: userData.bestTime,
+              completedAt: userData.latestCompletion,
+            };
+          });
+
+          // Sort by total normalized score and then by best time
+          sortedEntries = aggregatedEntries.sort((a, b) => {
+            // First sort by normalized score (highest first)
+            if ((b.normalizedScore || 0) !== (a.normalizedScore || 0)) {
+              return (b.normalizedScore || 0) - (a.normalizedScore || 0);
             }
             // If scores are the same, sort by time taken (lowest first)
             return a.timeTaken - b.timeTaken;
           });
-
-          // Assign ranks within each quiz group
-          entriesByQuiz[quizId].forEach((entry, index) => {
-            entry.rank = index + 1;
+        } else {
+          // Specific quiz category is selected - sort individual entries
+          sortedEntries = entries.sort((a, b) => {
+            // First sort by normalized score (highest first)
+            if ((b.normalizedScore || 0) !== (a.normalizedScore || 0)) {
+              return (b.normalizedScore || 0) - (a.normalizedScore || 0);
+            }
+            // If scores are the same, sort by time taken (lowest first)
+            return a.timeTaken - b.timeTaken;
           });
-        });
+        }
 
-        // Combine all entries back and sort for overall ranking
-        let allSortedEntries = entries.sort((a, b) => {
-          // First sort by score (highest first)
-          if (b.score !== a.score) {
-            return b.score - a.score;
-          }
-          // If scores are the same, sort by time taken (lowest first)
-          return a.timeTaken - b.timeTaken;
-        });
-
-        // Assign overall ranks
-        allSortedEntries.forEach((entry, index) => {
+        // Assign ranks
+        sortedEntries.forEach((entry, index) => {
           entry.rank = index + 1;
-        });
-
-        // Limit to 50 entries for display
-        allSortedEntries = allSortedEntries.slice(0, 50);
-
-        // Then apply the quiz titles to the entries
-        console.log("Quiz info cache after fetch:", quizInfoCache);
-
-        // Create updated entries with quiz titles and usernames from cache
-        const updatedEntries = allSortedEntries.map((entry) => {
-          // Map quiz IDs to quiz titles using the cache
+        }); // Update entries with cached user and quiz info
+        const updatedEntries = sortedEntries.map((entry) => {
+          // Map quiz IDs to quiz titles
           let quizTitle = entry.quizTitle;
           if (quizInfoCache[entry.quizTitle]) {
             quizTitle = quizInfoCache[entry.quizTitle];
-            console.log(`Mapped ${entry.quizTitle} to ${quizTitle}`);
-          } else {
-            console.log(`No quiz title found for ID: ${entry.quizTitle}`);
           }
 
-          // Map user IDs to usernames using the cache
+          // Map user IDs to usernames - making sure to use the userId field
+          // which contains the actual Firebase user ID
           let username = entry.username;
-          if (userInfoCache[entry.username]) {
-            username = userInfoCache[entry.username];
+          if (entry.userId && userInfoCache[entry.userId]) {
+            username = userInfoCache[entry.userId];
           }
 
           return {
             ...entry,
-            username: username,
-            quizTitle: quizTitle,
+            username,
+            quizTitle,
           };
         });
 
-        console.log(
-          `Processed ${updatedEntries.length} leaderboard entries:`,
-          updatedEntries
-        );
-        setLeaderboardData(updatedEntries);
+        // Find the current user's entry if authenticated
+        if (user) {
+          const userEntry = updatedEntries.find(
+            (entry) => entry.userId === user.uid
+          );
+          setCurrentUserEntry(userEntry || null);
+        }
+
+        // Limit displayed entries to 50
+        setLeaderboardData(updatedEntries.slice(0, 50));
       } catch (err) {
         console.error("Error fetching leaderboard data:", err);
         if (err instanceof Error) {
-          // More specific error message based on error type
-          if (err.message.includes("permission-denied")) {
-            setError(
-              "Permission denied: Please check Firestore security rules for the 'responses' collection."
-            );
-          } else {
-            setError(`Failed to load leaderboard data: ${err.message}`);
-          }
+          setError(err.message);
         } else {
           setError("Failed to load leaderboard data. Please try again later.");
         }
@@ -292,7 +398,16 @@ const LeaderboardPage = () => {
     };
 
     fetchLeaderboardData();
-  }, [timeFrame, quizInfoCache, userInfoCache, fetchQuizInfo, fetchUserInfo]);
+  }, [
+    timeFrame,
+    category,
+    difficulty,
+    user,
+    userInfoCache,
+    quizInfoCache,
+    fetchQuizInfo,
+    fetchUserInfo,
+  ]);
 
   // Format the date to a readable string
   const formatDate = (date: Date) => {
@@ -315,54 +430,30 @@ const LeaderboardPage = () => {
       <main className="container mx-auto px-4 py-12">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-10">
-            <h1 className="text-4xl text-black font-bold mb-4 bg-clip-text  bg-gradient-to-r from-purple-primary to-tech-blue-light">
+            <h1 className="text-4xl text-black font-bold mb-4 bg-clip-text bg-gradient-to-r from-purple-primary to-tech-blue-light">
               Leaderboard
             </h1>
             <p className="text-gray-600 max-w-2xl mx-auto">
               See how you stack up against other quiz-takers. The top performers
-              are showcased here based on their scores and completion time.
+              are showcased here based on their scores, difficulty level, and
+              completion time.
             </p>
           </div>
-
-          {/* Filters */}
-          <div className="bg-white p-4 rounded-xl shadow-sm mb-6 flex flex-wrap gap-4 justify-between items-center">
-            <div className="flex items-center gap-4">
-              <span className="text-gray-700 font-medium">Time Period:</span>
-              <div className="flex bg-gray-100 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => setTimeFrame("all")}
-                  className={`px-4 py-2 text-sm ${
-                    timeFrame === "all"
-                      ? "bg-indigo-600 text-white"
-                      : "text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  All Time
-                </button>
-                <button
-                  onClick={() => setTimeFrame("month")}
-                  className={`px-4 py-2 text-sm ${
-                    timeFrame === "month"
-                      ? "bg-indigo-600 text-white"
-                      : "text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  This Month
-                </button>
-                <button
-                  onClick={() => setTimeFrame("week")}
-                  className={`px-4 py-2 text-sm ${
-                    timeFrame === "week"
-                      ? "bg-indigo-600 text-white"
-                      : "text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  This Week
-                </button>
-              </div>
-            </div>
-          </div>
-
+          {/* Filters Component */}
+          <LeaderboardFilters
+            timeFrame={timeFrame}
+            category={category}
+            difficulty={difficulty}
+            onFilterChange={handleFilterChange}
+          />{" "}
+          {/* Current User Rank Card */}
+          {user && (
+            <UserRank
+              currentUserEntry={currentUserEntry}
+              isLoading={isLoading}
+              isGlobalRanking={!category}
+            />
+          )}
           {/* Leaderboard table */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             {isLoading ? (
@@ -393,6 +484,7 @@ const LeaderboardPage = () => {
               </div>
             ) : (
               <div className="overflow-x-auto">
+                {" "}
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b">
                     <tr>
@@ -403,22 +495,32 @@ const LeaderboardPage = () => {
                         User
                       </th>
                       <th className="py-4 px-6 text-left text-gray-500 font-medium">
-                        Quiz
+                        {!category ? "Quizzes Completed" : "Quiz"}
                       </th>
                       <th className="py-4 px-6 text-left text-gray-500 font-medium">
-                        Score
+                        {!category ? "Best Difficulty" : "Difficulty"}
                       </th>
                       <th className="py-4 px-6 text-left text-gray-500 font-medium">
-                        Time Taken
+                        {!category ? "Avg. Score" : "Score"}
                       </th>
                       <th className="py-4 px-6 text-left text-gray-500 font-medium">
-                        Completed On
+                        {!category ? "Best Time" : "Time Taken"}
+                      </th>
+                      <th className="py-4 px-6 text-left text-gray-500 font-medium">
+                        {!category ? "Latest Quiz" : "Completed On"}
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
                     {leaderboardData.map((entry) => (
-                      <tr key={entry.id} className="hover:bg-gray-50">
+                      <tr
+                        key={entry.id}
+                        className={`hover:bg-gray-50 ${
+                          user && entry.userId === user.uid
+                            ? "bg-indigo-50"
+                            : ""
+                        }`}
+                      >
                         <td className="py-4 px-6">
                           <div className="flex items-center">
                             {entry.rank === 1 && (
@@ -446,9 +548,27 @@ const LeaderboardPage = () => {
                           {entry.quizTitle}
                         </td>
                         <td className="py-4 px-6">
+                          <span
+                            className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                              entry.difficulty === "hard"
+                                ? "bg-red-100 text-red-800"
+                                : entry.difficulty === "medium"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-green-100 text-green-800"
+                            }`}
+                          >
+                            {entry.difficulty || "Basic"}
+                          </span>
+                        </td>{" "}
+                        <td className="py-4 px-6">
                           <span className="font-bold text-indigo-600">
                             {entry.score}%
                           </span>
+                          {!category && entry.normalizedScore && (
+                            <span className="block text-xs text-gray-500">
+                              Total: {Math.round(entry.normalizedScore)} pts
+                            </span>
+                          )}
                         </td>
                         <td className="py-4 px-6 text-gray-700">
                           {formatTime(entry.timeTaken)}
@@ -462,46 +582,12 @@ const LeaderboardPage = () => {
                 </table>
               </div>
             )}
-          </div>
-
-          {/* Achievement section */}
-          <div className="mt-10">
-            <h2 className="text-2xl font-bold mb-6">Top Achievers</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {leaderboardData.slice(0, 3).map((entry, index) => (
-                <div
-                  key={entry.id}
-                  className="bg-white p-6 rounded-xl shadow-sm border-t-4 border-indigo-600"
-                >
-                  <div className="flex items-center mb-4">
-                    <div className="w-12 h-12 flex items-center justify-center bg-indigo-100 rounded-full text-2xl mr-4">
-                      {index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉"}
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-lg">{entry.username}</h3>
-                      <p className="text-sm text-gray-500">{entry.quizTitle}</p>
-                    </div>
-                  </div>
-                  <div className="flex justify-between text-sm text-gray-600">
-                    <div>
-                      <p className="font-medium">Score</p>
-                      <p className="text-xl font-bold text-indigo-600">
-                        {entry.score}%
-                      </p>
-                    </div>
-                    <div>
-                      <p className="font-medium">Time</p>
-                      <p className="text-lg">{formatTime(entry.timeTaken)}</p>
-                    </div>
-                    <div>
-                      <p className="font-medium">Date</p>
-                      <p>{formatDate(entry.completedAt)}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          </div>{" "}
+          {/* Top Performers Component */}
+          <TopPerformers
+            topEntries={leaderboardData.slice(0, 3)}
+            showGlobalRanking={!category}
+          />
         </div>
       </main>
     </div>
