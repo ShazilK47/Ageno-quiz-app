@@ -9,6 +9,7 @@ import {
   serverTimestamp,
   writeBatch,
   doc,
+  setDoc,
 } from "firebase/firestore";
 import { db } from "@/firebase/client";
 import { FiPlus, FiTrash, FiSave, FiArrowLeft } from "react-icons/fi";
@@ -16,11 +17,16 @@ import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
 import { QuizDifficulty } from "@/types/quiz";
 
-interface QuizQuestion {
+interface QuestionOption {
   text: string;
-  options: string[];
-  correctIndex: number;
-  type: "mcq"; // Can expand to support more types later
+  isCorrect: boolean;
+}
+
+interface Question {
+  text: string;
+  options: QuestionOption[];
+  points: number;
+  type: string;
 }
 
 export default function NewQuizPage() {
@@ -34,180 +40,166 @@ export default function NewQuizPage() {
   const [description, setDescription] = useState<string>("");
   const [duration, setDuration] = useState<number>(30); // Default duration in minutes
   const [accessCode, setAccessCode] = useState<string>("");
+  const [isPublic, setIsPublic] = useState<boolean>(true);
+  const [requiresAccessCode, setRequiresAccessCode] = useState<boolean>(false);
   const [isAutoCheck, setIsAutoCheck] = useState<boolean>(true);
 
   // Difficulty settings
-  const [availableDifficulties] = useState<QuizDifficulty[]>([
-    "easy",
-    "medium",
-    "hard",
-  ]);
-  const [activeDifficulty, setActiveDifficulty] =
-    useState<QuizDifficulty>("medium");
+  const [availableDifficulties] = useState<QuizDifficulty[]>(["easy", "medium", "hard"]);
+  const [activeDifficulty, setActiveDifficulty] = useState<QuizDifficulty>("easy");
 
   // Questions state by difficulty
-  const [questionsByDifficulty, setQuestionsByDifficulty] = useState<
-    Record<QuizDifficulty, QuizQuestion[]>
-  >({
-    easy: [
-      {
-        text: "",
-        options: ["", "", "", ""],
-        correctIndex: 0,
-        type: "mcq",
-      },
-    ],
-    medium: [
-      {
-        text: "",
-        options: ["", "", "", ""],
-        correctIndex: 0,
-        type: "mcq",
-      },
-    ],
-    hard: [
-      {
-        text: "",
-        options: ["", "", "", ""],
-        correctIndex: 0,
-        type: "mcq",
-      },
-    ],
+  const [questions, setQuestions] = useState<Record<QuizDifficulty, Question[]>>({
+    easy: [],
+    medium: [],
+    hard: [],
   });
 
-  // Convenient getter for current questions
-  const questions = questionsByDifficulty[activeDifficulty];
-
+  // Helper function to add a new question to the current difficulty level
   const handleAddQuestion = () => {
-    setQuestionsByDifficulty((prev) => ({
+    setQuestions((prev) => ({
       ...prev,
       [activeDifficulty]: [
         ...prev[activeDifficulty],
         {
           text: "",
-          options: ["", "", "", ""],
-          correctIndex: 0,
-          type: "mcq",
+          options: [
+            { text: "", isCorrect: false },
+            { text: "", isCorrect: false },
+            { text: "", isCorrect: false },
+            { text: "", isCorrect: false }
+          ],
+          points: 1,
+          type: "mcq"
         },
       ],
     }));
   };
 
+  // Helper function to remove a question
   const handleRemoveQuestion = (index: number) => {
-    if (questionsByDifficulty[activeDifficulty].length > 1) {
-      const updatedQuestions = [...questionsByDifficulty[activeDifficulty]];
-      updatedQuestions.splice(index, 1);
-
-      setQuestionsByDifficulty((prev) => ({
-        ...prev,
-        [activeDifficulty]: updatedQuestions,
-      }));
-    } else {
-      setError(
-        `You need at least one question for ${activeDifficulty} difficulty.`
-      );
-    }
+    const updatedQuestions = { ...questions };
+    updatedQuestions[activeDifficulty].splice(index, 1);
+    setQuestions(updatedQuestions);
   };
 
-  const handleQuestionChange = (
-    index: number,
-    field: keyof QuizQuestion,
-    value: any
-  ) => {
-    const updatedQuestions = [...questionsByDifficulty[activeDifficulty]];
-    updatedQuestions[index] = {
-      ...updatedQuestions[index],
-      [field]: value,
-    };
-
-    setQuestionsByDifficulty((prev) => ({
-      ...prev,
-      [activeDifficulty]: updatedQuestions,
-    }));
+  // Helper function to update question text
+  const handleQuestionTextChange = (questionIndex: number, value: string) => {
+    const updatedQuestions = { ...questions };
+    updatedQuestions[activeDifficulty][questionIndex].text = value;
+    setQuestions(updatedQuestions);
   };
 
-  const handleOptionChange = (
-    questionIndex: number,
-    optionIndex: number,
-    value: string
-  ) => {
-    const updatedQuestions = [...questionsByDifficulty[activeDifficulty]];
-    updatedQuestions[questionIndex].options[optionIndex] = value;
-
-    setQuestionsByDifficulty((prev) => ({
-      ...prev,
-      [activeDifficulty]: updatedQuestions,
-    }));
+  // Helper function to update question points
+  const handlePointsChange = (questionIndex: number, value: number) => {
+    const updatedQuestions = { ...questions };
+    updatedQuestions[activeDifficulty][questionIndex].points = value;
+    setQuestions(updatedQuestions);
   };
 
+  // Helper function to update option text
+  const handleOptionTextChange = (questionIndex: number, optionIndex: number, value: string) => {
+    const updatedQuestions = { ...questions };
+    updatedQuestions[activeDifficulty][questionIndex].options[optionIndex].text = value;
+    setQuestions(updatedQuestions);
+  };
+
+  // Helper function to mark an option as correct
+  const handleOptionCorrectChange = (questionIndex: number, optionIndex: number) => {
+    const updatedQuestions = { ...questions };
+    
+    // Set all options to false first
+    updatedQuestions[activeDifficulty][questionIndex].options.forEach((option, i) => {
+      option.isCorrect = i === optionIndex;
+    });
+    
+    setQuestions(updatedQuestions);
+  };
+
+  // Helper function to add a new option to a question
   const handleAddOption = (questionIndex: number) => {
-    const updatedQuestions = [...questionsByDifficulty[activeDifficulty]];
-    updatedQuestions[questionIndex].options.push("");
-
-    setQuestionsByDifficulty((prev) => ({
-      ...prev,
-      [activeDifficulty]: updatedQuestions,
-    }));
+    const updatedQuestions = { ...questions };
+    updatedQuestions[activeDifficulty][questionIndex].options.push({ text: "", isCorrect: false });
+    setQuestions(updatedQuestions);
   };
 
+  // Helper function to remove an option from a question
   const handleRemoveOption = (questionIndex: number, optionIndex: number) => {
-    if (
-      questionsByDifficulty[activeDifficulty][questionIndex].options.length > 2
-    ) {
-      const updatedQuestions = [...questionsByDifficulty[activeDifficulty]];
-      updatedQuestions[questionIndex].options.splice(optionIndex, 1);
-
-      // If we're removing the correct option or an option before it, adjust the correct index
-      if (optionIndex === updatedQuestions[questionIndex].correctIndex) {
-        updatedQuestions[questionIndex].correctIndex = 0;
-      } else if (optionIndex < updatedQuestions[questionIndex].correctIndex) {
-        updatedQuestions[questionIndex].correctIndex--;
-      }
-
-      setQuestionsByDifficulty((prev) => ({
-        ...prev,
-        [activeDifficulty]: updatedQuestions,
-      }));
-    } else {
-      setError("Each question must have at least 2 options.");
+    if (questions[activeDifficulty][questionIndex].options.length <= 2) {
+      setError("Each question must have at least 2 options");
+      return;
     }
+
+    const updatedQuestions = { ...questions };
+    updatedQuestions[activeDifficulty][questionIndex].options.splice(optionIndex, 1);
+    
+    // If we removed the correct option, set the first option as correct
+    const hasCorrectOption = updatedQuestions[activeDifficulty][questionIndex].options.some(
+      option => option.isCorrect
+    );
+    
+    if (!hasCorrectOption && updatedQuestions[activeDifficulty][questionIndex].options.length > 0) {
+      updatedQuestions[activeDifficulty][questionIndex].options[0].isCorrect = true;
+    }
+    
+    setQuestions(updatedQuestions);
   };
 
+  // Helper function to generate a random access code
+  const generateRandomCode = (length: number): string => {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return result;
+  };
+
+  // Validation function
   const validateQuiz = () => {
     if (!title.trim()) {
-      setError("Quiz title is required.");
+      setError("Quiz title is required");
       return false;
     }
 
     if (duration <= 0) {
-      setError("Quiz duration must be greater than 0 minutes.");
+      setError("Quiz duration must be greater than 0");
+      return false;
+    }
+
+    // Check if there's at least one question in any difficulty level
+    const hasDifficultyWithQuestions = Object.values(questions).some(
+      difficultyQuestions => difficultyQuestions.length > 0
+    );
+
+    if (!hasDifficultyWithQuestions) {
+      setError("Add at least one question to any difficulty level");
       return false;
     }
 
     // Validate all questions for all difficulties
     for (const difficulty of availableDifficulties) {
-      const difficultyQuestions = questionsByDifficulty[difficulty];
-
-      for (let i = 0; i < difficultyQuestions.length; i++) {
-        const question = difficultyQuestions[i];
+      for (let i = 0; i < questions[difficulty].length; i++) {
+        const question = questions[difficulty][i];
 
         if (!question.text.trim()) {
-          setError(
-            `${
-              difficulty.charAt(0).toUpperCase() + difficulty.slice(1)
-            } difficulty - Question ${i + 1} is missing text.`
-          );
+          setError(`Question ${i + 1} in ${difficulty} difficulty is missing text`);
           setActiveDifficulty(difficulty);
           return false;
         }
 
+        // Check if there's at least one correct option
+        const hasCorrectOption = question.options.some(option => option.isCorrect);
+        if (!hasCorrectOption) {
+          setError(`Question ${i + 1} in ${difficulty} difficulty needs at least one correct answer`);
+          setActiveDifficulty(difficulty);
+          return false;
+        }
+
+        // Validate all options have text
         for (let j = 0; j < question.options.length; j++) {
-          if (!question.options[j].trim()) {
-            setError(
-              `${
-                difficulty.charAt(0).toUpperCase() + difficulty.slice(1)
-              } difficulty - Question ${i + 1}, Option ${j + 1} is empty.`
-            );
+          if (!question.options[j].text.trim()) {
+            setError(`Option ${j + 1} in question ${i + 1} (${difficulty}) is missing text`);
             setActiveDifficulty(difficulty);
             return false;
           }
@@ -218,6 +210,7 @@ export default function NewQuizPage() {
     return true;
   };
 
+  // Submit handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -229,55 +222,57 @@ export default function NewQuizPage() {
     try {
       setIsLoading(true);
 
-      // Create the quiz document
+      // Filter difficulties that have questions
+      const diffWithQuestions = availableDifficulties.filter(
+        diff => questions[diff].length > 0
+      );
+
+      // Create the quiz document with the correct structure
       const quizData = {
         title,
         description,
-        duration,
-        difficulty: activeDifficulty, // Add difficulty to quiz document
-        accessCode: accessCode || null, // If empty, store as null
+        duration: Number(duration),
+        accessCode: accessCode || generateRandomCode(6),
+        active: true,
+        availableDifficulties: diffWithQuestions,
         createdAt: serverTimestamp(),
-        createdBy: user?.uid || "Unknown",
+        createdBy: user?.uid || "unknown",
         isAutoCheck,
+        isPublic,
+        requiresAccessCode: requiresAccessCode || (accessCode && accessCode.length > 0),
+        updatedAt: serverTimestamp(),
       };
 
-      // Save quiz to Firestore
-      const quizRef = await addDoc(collection(db, "quizzes"), quizData);
+      // Create the quiz document
+      const quizRef = doc(collection(db, "quizzes"));
+      await setDoc(quizRef, quizData);
 
-      // Save each question as a document in a subcollection
-      const questionsCollectionRef = collection(
-        db,
-        "quizzes",
-        quizRef.id,
-        "questions"
-      );
-
-      // Batch write for efficiency
+      // Create batch to add all questions efficiently
       const batch = writeBatch(db);
 
-      for (const difficulty of availableDifficulties) {
-        const difficultyQuestions = questionsByDifficulty[difficulty];
-
-        for (const question of difficultyQuestions) {
-          const questionDocRef = doc(questionsCollectionRef);
-          batch.set(questionDocRef, {
+      // Add questions for each difficulty level as subcollections
+      for (const difficulty of diffWithQuestions) {
+        for (const question of questions[difficulty]) {
+          // Create a document in the appropriate subcollection
+          const questionRef = doc(collection(quizRef, `questions_${difficulty}`));
+          
+          batch.set(questionRef, {
             text: question.text,
             options: question.options,
-            correctIndex: question.correctIndex,
+            points: question.points,
             type: question.type,
-            difficulty, // Store the difficulty with each question
           });
         }
       }
 
-      // Commit the batch
+      // Commit all the question documents
       await batch.commit();
 
-      // Navigate back to the quiz management page
+      // Navigate back to the quizzes page
       router.push("/admin/quizzes");
     } catch (error: any) {
       console.error("Error creating quiz:", error);
-      setError(error.message || "Failed to create quiz.");
+      setError(error.message || "Failed to create quiz");
     } finally {
       setIsLoading(false);
     }
@@ -296,7 +291,7 @@ export default function NewQuizPage() {
           <h1 className="text-2xl font-bold text-gray-900">Create New Quiz</h1>
         </div>
         <p className="text-gray-600">
-          Add a new quiz with questions and options
+          Add a new quiz with questions for multiple difficulty levels
         </p>
       </div>
 
@@ -367,87 +362,81 @@ export default function NewQuizPage() {
                   required
                 />
               </div>
+
               <div>
                 <label
                   htmlFor="accessCode"
                   className="block text-sm font-medium text-gray-700 mb-1"
                 >
-                  Access Code (Optional)
+                  Access Code
                 </label>
                 <input
                   type="text"
                   id="accessCode"
                   value={accessCode}
-                  onChange={(e) => setAccessCode(e.target.value)}
-                  placeholder="e.g., QUIZ123"
+                  onChange={(e) => {
+                    const code = e.target.value.toUpperCase();
+                    setAccessCode(code);
+                    if (code.length > 0) {
+                      setRequiresAccessCode(true);
+                    }
+                  }}
+                  placeholder="Leave blank to auto-generate"
                   className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  Leave blank for no access restriction
-                </p>
-              </div>
-              <div className="flex items-start pt-6">
-                <div className="flex items-center h-5">
-                  <input
-                    id="isAutoCheck"
-                    type="checkbox"
-                    checked={isAutoCheck}
-                    onChange={(e) => setIsAutoCheck(e.target.checked)}
-                    className="focus:ring-purple-500 h-4 w-4 text-purple-600 border-gray-300 rounded"
-                  />
-                </div>
-                <div className="ml-3 text-sm">
-                  <label
-                    htmlFor="isAutoCheck"
-                    className="font-medium text-gray-700"
-                  >
-                    Auto Check Answers
-                  </label>
-                  <p className="text-gray-500">
-                    Automatically grade quiz attempts
-                  </p>
-                </div>
-              </div>{" "}
-              <div>
-                <label
-                  htmlFor="difficulty"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Default Difficulty Level
-                  <span className="text-red-500">*</span>
-                </label>
-                <select
-                  id="difficulty"
-                  value={activeDifficulty}
-                  onChange={(e) =>
-                    setActiveDifficulty(e.target.value as QuizDifficulty)
-                  }
-                  className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                  required
-                >
-                  <option value="easy">Easy</option>
-                  <option value="medium">Medium</option>
-                  <option value="hard">Hard</option>
-                </select>
-                <p className="mt-1 text-xs text-gray-500">
-                  This will be the default difficulty shown when users take the
-                  quiz
+                  A random code will be generated if left blank
                 </p>
               </div>
             </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="flex items-center">
+                <input
+                  id="isPublic"
+                  type="checkbox"
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                  className="h-4 w-4 text-purple-600 border-gray-300 rounded"
+                />
+                <label htmlFor="isPublic" className="ml-2 text-gray-700">
+                  Public Quiz
+                </label>
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  id="requiresAccessCode"
+                  type="checkbox"
+                  checked={requiresAccessCode || accessCode.length > 0}
+                  onChange={(e) => setRequiresAccessCode(e.target.checked)}
+                  className="h-4 w-4 text-purple-600 border-gray-300 rounded"
+                />
+                <label htmlFor="requiresAccessCode" className="ml-2 text-gray-700">
+                  Require Access Code
+                </label>
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  id="isAutoCheck"
+                  type="checkbox"
+                  checked={isAutoCheck}
+                  onChange={(e) => setIsAutoCheck(e.target.checked)}
+                  className="h-4 w-4 text-purple-600 border-gray-300 rounded"
+                />
+                <label htmlFor="isAutoCheck" className="ml-2 text-gray-700">
+                  Auto-check Answers
+                </label>
+              </div>
+            </div>
           </div>
-        </div>{" "}
+        </div>
+
         {/* Questions */}
         <div className="mt-8 space-y-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-medium text-gray-900">Questions</h2>
-            <button
-              type="button"
-              onClick={handleAddQuestion}
-              className="inline-flex items-center px-3 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-            >
-              <FiPlus className="mr-2" /> Add Question
-            </button>
           </div>
 
           {/* Difficulty Tabs */}
@@ -457,159 +446,178 @@ export default function NewQuizPage() {
                 className="-mb-px flex space-x-4"
                 aria-label="Difficulty Tabs"
               >
-                {availableDifficulties.map((tabDifficulty) => (
+                {availableDifficulties.map((difficultyTab) => (
                   <button
-                    key={tabDifficulty}
-                    onClick={() => setActiveDifficulty(tabDifficulty)}
+                    key={difficultyTab}
+                    type="button"
+                    onClick={() => setActiveDifficulty(difficultyTab)}
                     className={`whitespace-nowrap py-3 px-3 border-b-2 font-medium text-sm ${
-                      activeDifficulty === tabDifficulty
+                      activeDifficulty === difficultyTab
                         ? "border-purple-500 text-purple-600"
                         : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                     }`}
                   >
                     <span
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mr-2 ${
-                        tabDifficulty === "easy"
+                        difficultyTab === "easy"
                           ? "bg-green-100 text-green-800"
-                          : tabDifficulty === "hard"
+                          : difficultyTab === "hard"
                           ? "bg-red-100 text-red-800"
                           : "bg-yellow-100 text-yellow-800"
                       }`}
                     >
-                      {tabDifficulty.charAt(0).toUpperCase() +
-                        tabDifficulty.slice(1)}
+                      {difficultyTab.charAt(0).toUpperCase() + difficultyTab.slice(1)}
                     </span>
-                    Questions{" "}
-                    {questionsByDifficulty[tabDifficulty]?.length || 0}
+                    Questions ({questions[difficultyTab].length})
                   </button>
                 ))}
               </nav>
             </div>
             <p className="text-sm text-gray-500 mt-2">
-              Create questions for each difficulty level. All difficulty levels
-              will be available to users when taking the quiz.
+              Create questions for each difficulty level. Users will be able to choose from available difficulty levels.
             </p>
           </div>
 
-          {questions.map((question, questionIndex) => (
-            <div
-              key={questionIndex}
-              className="bg-white rounded-lg shadow overflow-hidden"
-            >
-              <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-                <h3 className="text-md font-medium text-gray-900">
-                  Question {questionIndex + 1}
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveQuestion(questionIndex)}
-                  className="text-red-600 hover:text-red-900"
-                >
-                  <FiTrash />
-                </button>
+          {/* Button to add a question */}
+          <button
+            type="button"
+            onClick={handleAddQuestion}
+            className="inline-flex items-center px-3 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+          >
+            <FiPlus className="mr-2" /> Add {activeDifficulty.charAt(0).toUpperCase() + activeDifficulty.slice(1)} Question
+          </button>
+
+          {/* Questions list */}
+          <div className="space-y-6 mt-4">
+            {questions[activeDifficulty].length === 0 ? (
+              <div className="text-center p-6 bg-gray-50 border border-gray-200 rounded-lg">
+                <p className="text-gray-500">
+                  No {activeDifficulty} questions yet. Click the button above to add one.
+                </p>
               </div>
-
-              <div className="p-6 space-y-4">
-                <div>
-                  <label
-                    htmlFor={`question-${questionIndex}-text`}
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Question Text<span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    id={`question-${questionIndex}-text`}
-                    value={question.text}
-                    onChange={(e) =>
-                      handleQuestionChange(
-                        questionIndex,
-                        "text",
-                        e.target.value
-                      )
-                    }
-                    placeholder="Enter the question"
-                    rows={2}
-                    className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Options<span className="text-red-500">*</span>
-                    </label>
+            ) : (
+              questions[activeDifficulty].map((question, questionIndex) => (
+                <div
+                  key={questionIndex}
+                  className="bg-white rounded-lg shadow overflow-hidden border border-gray-200"
+                >
+                  <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                    <h3 className="text-md font-medium text-gray-900">
+                      Question {questionIndex + 1}
+                    </h3>
                     <button
                       type="button"
-                      onClick={() => handleAddOption(questionIndex)}
-                      className="text-sm text-purple-600 hover:text-purple-800 flex items-center"
+                      onClick={() => handleRemoveQuestion(questionIndex)}
+                      className="text-red-600 hover:text-red-900"
                     >
-                      <FiPlus className="mr-1" size={14} /> Add Option
+                      <FiTrash />
                     </button>
                   </div>
 
-                  <div className="space-y-2">
-                    {question.options.map((option, optionIndex) => (
-                      <div
-                        key={optionIndex}
-                        className="flex items-center space-x-2"
+                  <div className="p-6 space-y-4">
+                    <div>
+                      <label
+                        htmlFor={`question-${activeDifficulty}-${questionIndex}-text`}
+                        className="block text-sm font-medium text-gray-700 mb-1"
                       >
-                        <div className="flex-grow">
-                          <div className="relative flex items-center">
-                            <input
-                              type="radio"
-                              name={`question-${questionIndex}-correct`}
-                              checked={question.correctIndex === optionIndex}
-                              onChange={() =>
-                                handleQuestionChange(
-                                  questionIndex,
-                                  "correctIndex",
-                                  optionIndex
-                                )
-                              }
-                              className="focus:ring-purple-500 h-4 w-4 text-purple-600 border-gray-300"
-                            />
-                            <input
-                              type="text"
-                              value={option}
-                              onChange={(e) =>
-                                handleOptionChange(
-                                  questionIndex,
-                                  optionIndex,
-                                  e.target.value
-                                )
-                              }
-                              placeholder={`Option ${optionIndex + 1}`}
-                              className="ml-2 block w-full border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                              required
-                            />
-                          </div>
-                          <div className="pl-6 text-xs text-gray-500 mt-0.5">
-                            {question.correctIndex === optionIndex &&
-                              "Correct answer"}
-                          </div>
-                        </div>
+                        Question Text<span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        id={`question-${activeDifficulty}-${questionIndex}-text`}
+                        value={question.text}
+                        onChange={(e) => handleQuestionTextChange(questionIndex, e.target.value)}
+                        placeholder="Enter the question"
+                        rows={2}
+                        className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor={`question-${activeDifficulty}-${questionIndex}-points`}
+                        className="block text-sm font-medium text-gray-700 mb-1"
+                      >
+                        Points<span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        id={`question-${activeDifficulty}-${questionIndex}-points`}
+                        type="number"
+                        value={question.points}
+                        onChange={(e) => handlePointsChange(questionIndex, parseInt(e.target.value) || 1)}
+                        min="1"
+                        className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Options<span className="text-red-500">*</span>
+                        </label>
                         <button
                           type="button"
-                          onClick={() =>
-                            handleRemoveOption(questionIndex, optionIndex)
-                          }
-                          className="text-red-400 hover:text-red-600"
+                          onClick={() => handleAddOption(questionIndex)}
+                          className="text-sm text-purple-600 hover:text-purple-800 flex items-center"
                         >
-                          <FiTrash size={16} />
+                          <FiPlus className="mr-1" size={14} /> Add Option
                         </button>
                       </div>
-                    ))}
+
+                      <div className="space-y-2">
+                        {question.options.map((option, optionIndex) => (
+                          <div
+                            key={optionIndex}
+                            className="flex items-center space-x-2"
+                          >
+                            <div className="flex-grow">
+                              <div className="relative flex items-center">
+                                <input
+                                  type="radio"
+                                  name={`question-${activeDifficulty}-${questionIndex}-correct`}
+                                  checked={option.isCorrect}
+                                  onChange={() => handleOptionCorrectChange(questionIndex, optionIndex)}
+                                  className="focus:ring-purple-500 h-4 w-4 text-purple-600 border-gray-300"
+                                  required
+                                />
+                                <input
+                                  type="text"
+                                  value={option.text}
+                                  onChange={(e) => handleOptionTextChange(questionIndex, optionIndex, e.target.value)}
+                                  placeholder={`Option ${optionIndex + 1}`}
+                                  className="ml-2 block w-full border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                                  required
+                                />
+                              </div>
+                              {option.isCorrect && (
+                                <div className="pl-6 text-xs text-green-600 mt-0.5">
+                                  Correct answer
+                                </div>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveOption(questionIndex, optionIndex)}
+                              className="text-red-400 hover:text-red-600"
+                            >
+                              <FiTrash size={16} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          ))}
+              ))
+            )}
+          </div>
         </div>
+
         <div className="mt-8 flex justify-end">
           <button
             type="button"
-            onClick={() => router.push("/admin/quizzes")}
+            onClick={() => router.push("/quizzes")}
             className="mr-4 px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
           >
             Cancel
