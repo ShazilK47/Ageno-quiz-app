@@ -38,7 +38,7 @@ export default function NewQuizPage() {
   // Quiz details state
   const [title, setTitle] = useState<string>("");
   const [description, setDescription] = useState<string>("");
-  const [duration, setDuration] = useState<number>(30); // Default duration in minutes
+  const [duration, setDuration] = useState<number>(30); // Default overall duration in minutes
   const [accessCode, setAccessCode] = useState<string>("");
   const [isPublic, setIsPublic] = useState<boolean>(true);
   const [requiresAccessCode, setRequiresAccessCode] = useState<boolean>(false);
@@ -47,6 +47,15 @@ export default function NewQuizPage() {
   // Difficulty settings
   const [availableDifficulties] = useState<QuizDifficulty[]>(["easy", "medium", "hard"]);
   const [activeDifficulty, setActiveDifficulty] = useState<QuizDifficulty>("easy");
+  const [difficultySettings, setDifficultySettings] = useState<{
+    easy: { duration: number; pointsMultiplier: number };
+    medium: { duration: number; pointsMultiplier: number };
+    hard: { duration: number; pointsMultiplier: number };
+  }>({
+    easy: { duration: 30, pointsMultiplier: 1.0 },
+    medium: { duration: 25, pointsMultiplier: 1.5 },
+    hard: { duration: 20, pointsMultiplier: 2.0 },
+  });
 
   // Questions state by difficulty
   const [questions, setQuestions] = useState<Record<QuizDifficulty, Question[]>>({
@@ -209,6 +218,27 @@ export default function NewQuizPage() {
 
     return true;
   };
+  // Helper function to handle duration change for a specific difficulty
+  const handleDifficultyDurationChange = (difficulty: QuizDifficulty, newDuration: number) => {
+    setDifficultySettings(prev => ({
+      ...prev,
+      [difficulty]: {
+        ...prev[difficulty],
+        duration: newDuration
+      }
+    }));
+  };
+
+  // Helper function to handle points multiplier change for a specific difficulty
+  const handleDifficultyMultiplierChange = (difficulty: QuizDifficulty, newMultiplier: number) => {
+    setDifficultySettings(prev => ({
+      ...prev,
+      [difficulty]: {
+        ...prev[difficulty],
+        pointsMultiplier: newMultiplier
+      }
+    }));
+  };
 
   // Submit handler
   const handleSubmit = async (e: React.FormEvent) => {
@@ -227,11 +257,17 @@ export default function NewQuizPage() {
         diff => questions[diff].length > 0
       );
 
+      // Create filtered difficulty settings object with only the difficulties that have questions
+      const filteredDifficultySettings: Record<string, { duration: number; pointsMultiplier: number }> = {};
+      diffWithQuestions.forEach(diff => {
+        filteredDifficultySettings[diff] = difficultySettings[diff];
+      });
+
       // Create the quiz document with the correct structure
       const quizData = {
         title,
         description,
-        duration: Number(duration),
+        duration: Number(duration), // Keep overall duration for backward compatibility
         accessCode: accessCode || generateRandomCode(6),
         active: true,
         availableDifficulties: diffWithQuestions,
@@ -239,8 +275,9 @@ export default function NewQuizPage() {
         createdBy: user?.uid || "unknown",
         isAutoCheck,
         isPublic,
-        requiresAccessCode: requiresAccessCode || (accessCode && accessCode.length > 0),
+        requiresAccessCode: Boolean(requiresAccessCode || (accessCode && accessCode.length > 0)),
         updatedAt: serverTimestamp(),
+        difficultySettings: filteredDifficultySettings,
       };
 
       // Create the quiz document
@@ -269,7 +306,7 @@ export default function NewQuizPage() {
       await batch.commit();
 
       // Navigate back to the quizzes page
-      router.push("/admin/quizzes");
+      router.push("/quizzes");
     } catch (error: any) {
       console.error("Error creating quiz:", error);
       setError(error.message || "Failed to create quiz");
@@ -283,7 +320,7 @@ export default function NewQuizPage() {
       <div className="mb-6">
         <div className="flex items-center mb-4">
           <Link
-            href="/admin/quizzes"
+            href="/quizzes"
             className="mr-4 text-gray-600 hover:text-gray-800"
           >
             <FiArrowLeft size={20} />
@@ -341,15 +378,13 @@ export default function NewQuizPage() {
                 rows={3}
                 className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
               />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            </div>            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <label
                   htmlFor="duration"
                   className="block text-sm font-medium text-gray-700 mb-1"
                 >
-                  Duration (minutes)<span className="text-red-500">*</span>
+                  Default Duration (minutes)<span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
@@ -361,6 +396,9 @@ export default function NewQuizPage() {
                   className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
                   required
                 />
+                <p className="mt-1 text-xs text-gray-500">
+                  You can customize duration per difficulty level below
+                </p>
               </div>
 
               <div>
@@ -389,8 +427,74 @@ export default function NewQuizPage() {
                 </p>
               </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            <div className="border-t border-gray-200 pt-4 mt-4">
+              <h3 className="text-md font-medium text-gray-800 mb-3">Difficulty Time Settings</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Customize time limits for each difficulty level. Users will see the time limit for their selected difficulty.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {availableDifficulties.map((diff) => (
+                  <div key={diff} className={`p-4 rounded-lg border ${
+                    diff === 'easy' ? 'border-green-200 bg-green-50' :
+                    diff === 'medium' ? 'border-yellow-200 bg-yellow-50' :
+                    'border-red-200 bg-red-50'
+                  }`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-medium capitalize">{diff}</h4>
+                      <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                        diff === 'easy' ? 'bg-green-100 text-green-800' :
+                        diff === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {difficultySettings[diff].pointsMultiplier}x points
+                      </span>
+                    </div>
+                    <div>
+                      <label 
+                        htmlFor={`duration-${diff}`}
+                        className="block text-xs font-medium text-gray-500 mb-1"
+                      >
+                        Time Limit (minutes)
+                      </label>
+                      <input
+                        id={`duration-${diff}`}
+                        type="number"
+                        value={difficultySettings[diff].duration}
+                        onChange={(e) => handleDifficultyDurationChange(
+                          diff as QuizDifficulty, 
+                          parseInt(e.target.value) || difficultySettings[diff].duration
+                        )}
+                        min="1"
+                        max="180"
+                        className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                      />
+                    </div>
+                    <div className="mt-2">
+                      <label 
+                        htmlFor={`multiplier-${diff}`}
+                        className="block text-xs font-medium text-gray-500 mb-1"
+                      >
+                        Points Multiplier
+                      </label>
+                      <input
+                        id={`multiplier-${diff}`}
+                        type="number"
+                        value={difficultySettings[diff].pointsMultiplier}
+                        onChange={(e) => handleDifficultyMultiplierChange(
+                          diff as QuizDifficulty, 
+                          parseFloat(e.target.value) || difficultySettings[diff].pointsMultiplier
+                        )}
+                        min="0.1"
+                        max="5"
+                        step="0.1"
+                        className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="flex items-center">
                 <input
                   id="isPublic"
@@ -408,13 +512,24 @@ export default function NewQuizPage() {
                 <input
                   id="requiresAccessCode"
                   type="checkbox"
-                  checked={requiresAccessCode || accessCode.length > 0}
-                  onChange={(e) => setRequiresAccessCode(e.target.checked)}
+                  checked={requiresAccessCode}
+                  onChange={(e) => {
+                    setRequiresAccessCode(e.target.checked);
+                    // If unchecking and there's an access code, clear it
+                    if (!e.target.checked && accessCode.length > 0) {
+                      if (confirm("Remove the access code too?")) {
+                        setAccessCode("");
+                      }
+                    }
+                  }}
                   className="h-4 w-4 text-purple-600 border-gray-300 rounded"
                 />
                 <label htmlFor="requiresAccessCode" className="ml-2 text-gray-700">
                   Require Access Code
                 </label>
+                <span className="ml-2 text-xs text-gray-500">
+                  {requiresAccessCode ? "Access required" : "No access required"}
+                </span>
               </div>
 
               <div className="flex items-center">

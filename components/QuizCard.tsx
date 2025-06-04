@@ -109,13 +109,16 @@ export default function QuizCard({ quiz }: QuizCardProps) {
               <div>
                 <p className="text-xs font-medium text-gray-500">Duration</p>
                 <p className="text-sm font-semibold text-gray-800">
-                  {quiz.duration} mins
-                  {quiz.availableDifficulties &&
-                    quiz.availableDifficulties.length > 0 && (
+                  {quiz.difficultySettings && quiz.availableDifficulties && quiz.availableDifficulties.length > 0 ? (
+                    <>
+                      {quiz.difficultySettings[quiz.difficulty || "medium"]?.duration || quiz.duration} mins
                       <span className="ml-1 text-xs text-indigo-600">
-                        (per difficulty)
+                        (varies by difficulty)
                       </span>
-                    )}
+                    </>
+                  ) : (
+                    `${quiz.duration} mins`
+                  )}
                 </p>
               </div>
             </div>

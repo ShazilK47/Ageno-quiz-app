@@ -25,23 +25,15 @@ export default function QuizTimer({
       : 30; // Default to 30 minutes if duration is invalid
 
   // Convert minutes to seconds
-  const totalSeconds = validDuration * 60;
-
-  // Log warning if duration was invalid
+  const totalSeconds = validDuration * 60;  // Only log warnings for invalid duration, removed excessive logging
   useEffect(() => {
     if (validDuration !== duration) {
       console.warn(
         `Invalid quiz duration (${duration}), defaulting to ${validDuration} minutes`
       );
     }
-  }, [duration, validDuration]);
-
-  // Initialize time remaining if it's null
-  useEffect(() => {
-    if (timeRemaining === null) {
-      setTimeRemaining(totalSeconds);
-    }
-  }, [totalSeconds, timeRemaining, setTimeRemaining]);
+  }, [duration, validDuration]);  // Remove auto-initialization of timeRemaining to avoid render loops
+  // We'll rely on the parent component to set the initial time
 
   const [isWarning, setIsWarning] = useState(false);
 
@@ -93,7 +85,7 @@ export default function QuizTimer({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [timeRemaining, onTimeUp, paused, setTimeRemaining]);
+  }, [timeRemaining, onTimeUp, paused, totalSeconds]);
 
   // Warning animation for last 20% of time
   const pulseAnimation = isWarning

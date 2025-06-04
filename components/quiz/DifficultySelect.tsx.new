@@ -271,7 +271,8 @@ const DifficultySelect: React.FC<DifficultySelectProps> = ({
               </h3>
 
               <div className="mt-2 flex justify-between items-center text-gray-500">
-                <div className="flex flex-col">                  <div className="flex items-center text-sm font-semibold">
+                <div className="flex flex-col">
+                  <div className="flex items-center text-sm font-semibold">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       width="16"
@@ -287,14 +288,7 @@ const DifficultySelect: React.FC<DifficultySelectProps> = ({
                       <circle cx="12" cy="12" r="10" />
                       <polyline points="12 6 12 12 16 14" />
                     </svg>
-                    <span className={difficultySettings && difficultySettings[difficulty] ? "font-bold" : ""}>
-                      {info.timeLabel}
-                    </span>
-                    {difficultySettings && difficultySettings[difficulty] && (
-                      <span className="ml-1 text-xs bg-indigo-100 text-indigo-800 rounded-full px-2 py-0.5">
-                        {difficultySettings[difficulty].duration} min
-                      </span>
-                    )}
+                    {info.timeLabel}
                   </div>
                   <div className="flex items-center mt-2 text-sm font-semibold">
                     <svg

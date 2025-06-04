@@ -20,7 +20,7 @@ export default function QuizPage({
   params,
 }: {
   params: Promise<{ code: string }> | { code: string };
-}) {
+}){
   const unwrappedParams = use(params as Promise<{ code: string }>);
   const { code } = unwrappedParams;
   const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -55,6 +55,9 @@ export default function QuizPage({
     useState<string>("medium");
   const [difficultySelected, setDifficultySelected] = useState<boolean>(false);
   const [isLoadingQuestions, setIsLoadingQuestions] = useState<boolean>(false);
+
+  // State to track notifications about difficulty changes
+  const [difficultyChangeNotice, setDifficultyChangeNotice] = useState<string | null>(null);
 
   // Track tab visibility changes for proctoring
   useEffect(() => {
@@ -95,6 +98,9 @@ export default function QuizPage({
       );
     }
   }, [quizSubmitted, score]);
+
+  // Remove initialization effect to avoid re-render loops
+  // We'll rely solely on handleStartQuiz to initialize the timer
 
   // We'll use a single useEffect for auto-loading questions
   // that will be created after the loadQuestionsForDifficulty function is defined
@@ -367,22 +373,6 @@ export default function QuizPage({
     ]
   );
 
-  // Get duration for the selected difficulty with proper error handling
-  const getDifficultyDuration = (quiz: Quiz, difficulty: string): number => {
-    if (
-      quiz.difficultySettings &&
-      quiz.difficultySettings[
-        difficulty as keyof typeof quiz.difficultySettings
-      ]?.duration
-    ) {
-      return quiz.difficultySettings[
-        difficulty as keyof typeof quiz.difficultySettings
-      ]!.duration;
-    }
-    // Fall back to the quiz's general duration
-    return quiz.duration;
-  };
-
   // Get the point multiplier for the selected difficulty with proper error handling
   const getDifficultyMultiplier = (quiz: Quiz, difficulty: string): number => {
     if (
@@ -461,17 +451,63 @@ export default function QuizPage({
   useEffect(() => {
     // This effect now only handles logging the difficulty duration
     if (quizStarted && quiz && !quizSubmitted) {
-      const quizDuration = getDifficultyDuration(quiz, selectedDifficulty);
+      // Calculate duration once using optional chaining for cleaner code
+      const quizDuration = quiz.difficultySettings?.[selectedDifficulty as keyof typeof quiz.difficultySettings]?.duration ||
+        (selectedDifficulty === "easy" ? 45 : 
+         selectedDifficulty === "medium" ? 30 : 
+         selectedDifficulty === "hard" ? 20 : 30);
+      
       console.log(
         `Using ${selectedDifficulty} difficulty duration: ${quizDuration} minutes`
       );
     }
   }, [quizStarted, quiz, quizSubmitted, selectedDifficulty]);
+
+  // Effect to show a notification when difficulty changes and clear it after a few seconds
+  useEffect(() => {
+    if (quizStarted && quiz) {
+      // Calculate duration once using optional chaining
+      const duration = quiz.difficultySettings?.[selectedDifficulty as keyof typeof quiz.difficultySettings]?.duration ||
+        (selectedDifficulty === "easy" ? 45 : 
+         selectedDifficulty === "medium" ? 30 : 
+         selectedDifficulty === "hard" ? 20 : 30);
+      
+      setDifficultyChangeNotice(`Time adjusted to ${duration} minutes for ${selectedDifficulty} difficulty`);
+      
+      // Clear the message after 5 seconds
+      const timer = setTimeout(() => {
+        setDifficultyChangeNotice(null);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [selectedDifficulty, quizStarted, quiz]);
+
   const handleDifficultySelect = async (difficulty: string) => {
     console.log(`[MANUAL-SELECT] User selected ${difficulty} difficulty`);
 
+    if (difficulty === selectedDifficulty) {
+      console.log(`Already on ${difficulty} difficulty, skipping update`);
+      return; // Avoid unnecessary re-renders if difficulty hasn't changed
+    }
+
     // Update the selected difficulty state
     setSelectedDifficulty(difficulty);
+
+    // Reset the timer based on the new difficulty's duration
+    if (quiz) {
+      // Get duration directly from settings or use defaults
+      const newDuration = quiz.difficultySettings?.[difficulty as keyof typeof quiz.difficultySettings]?.duration || 
+        (difficulty === "easy" ? 45 : 
+         difficulty === "medium" ? 30 : 
+         difficulty === "hard" ? 20 : 30);
+      
+      console.log(`Resetting timer for ${difficulty} difficulty: ${newDuration} minutes`);
+      
+      // Convert minutes to seconds for the timer
+      const newTimeRemaining = newDuration * 60;
+      setTimeRemaining(newTimeRemaining);
+    }
 
     // Show loading state
     setIsLoadingQuestions(true);
@@ -529,16 +565,21 @@ export default function QuizPage({
       }
     }
 
-    // Initialize user answers array with empty answers
-    if (quiz && quiz.questions) {
-      const initialAnswers = quiz.questions.map((q) => ({
-        questionId: q.id,
-        selectedOptionIndex: null,
-      }));
-      setUserAnswers(initialAnswers);
-      setQuizStarted(true);
-      setQuizStartTime(new Date());
+    // Set the timer based on the selected difficulty
+    if (quiz) {
+      // Calculate duration directly to avoid function call
+      const duration = quiz.difficultySettings?.[selectedDifficulty as keyof typeof quiz.difficultySettings]?.duration ||
+        (selectedDifficulty === "easy" ? 45 : 
+         selectedDifficulty === "medium" ? 30 : 
+         selectedDifficulty === "hard" ? 20 : 30);
+      
+      console.log(`Starting quiz with ${selectedDifficulty} difficulty: ${duration} minutes`);
+      // Convert minutes to seconds for the timer
+      setTimeRemaining(duration * 60);
     }
+    
+    setQuizStarted(true);
+    setQuizStartTime(new Date());
   };
 
   const handleSelectOption = (questionIndex: number, optionIndex: number) => {
@@ -1266,37 +1307,33 @@ export default function QuizPage({
           <div className="bg-indigo-100 text-indigo-800 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap">
             Question {currentQuestionIndex + 1} of {quiz.questions.length}
           </div>
-          <div className="whitespace-nowrap">
+          <div className="flex flex-col items-end">
             {quizStarted && quiz && !quizSubmitted && (
-              <QuizTimer
-                duration={(() => {
-                  // Try to get the difficulty-specific duration
-                  try {
-                    if (
-                      quiz.difficultySettings &&
-                      selectedDifficulty &&
-                      quiz.difficultySettings[
-                        selectedDifficulty as keyof typeof quiz.difficultySettings
-                      ]?.duration
-                    ) {
-                      return quiz.difficultySettings[
-                        selectedDifficulty as keyof typeof quiz.difficultySettings
-                      ]!.duration;
-                    }
-                  } catch (err) {
-                    console.error("Error accessing difficulty settings:", err);
-                  }
-
-                  // Fallback to default quiz duration or 30 minutes
-                  return typeof quiz.duration === "number" && quiz.duration > 0
-                    ? quiz.duration
-                    : 30;
-                })()}
-                onTimeUp={handleSubmitQuiz}
-                paused={isSubmitting || quizSubmitted}
-                timeRemaining={timeRemaining}
-                setTimeRemaining={setTimeRemaining}
-              />
+              <>
+                <QuizTimer
+                  // We're using a fixed duration prop to avoid re-render issues
+                  // The actual duration is controlled by timeRemaining state
+                  // which is set when difficulty changes
+                  duration={30}
+                  onTimeUp={handleSubmitQuiz}
+                  paused={isSubmitting || quizSubmitted}
+                  timeRemaining={timeRemaining}
+                  setTimeRemaining={setTimeRemaining}
+                />
+                
+                {difficultyChangeNotice && (
+                  <div className="mt-2 text-xs animate-pulse text-indigo-600 font-medium">
+                    {difficultyChangeNotice}
+                  </div>
+                )}
+                
+                {/* Simplified debug duration display */}
+                {quiz && (
+                  <div className="mt-1 text-xs text-gray-500">
+                    Current {selectedDifficulty} difficulty selected
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -1381,6 +1418,12 @@ export default function QuizPage({
             </button>
           )}
         </div>
+
+        {difficultyChangeNotice && (
+          <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
+            <p className="text-sm text-yellow-600">{difficultyChangeNotice}</p>
+          </div>
+        )}
       </div>
     );
   };
@@ -1453,29 +1496,19 @@ export default function QuizPage({
               <h3 className="font-medium mb-1">Duration</h3>
               <p className="text-xl">
                 {/* Use difficulty-specific duration if available */}
-                {quiz.difficultySettings &&
-                quiz.difficultySettings[
-                  selectedDifficulty as keyof typeof quiz.difficultySettings
-                ]?.duration
-                  ? quiz.difficultySettings[
-                      selectedDifficulty as keyof typeof quiz.difficultySettings
-                    ]!.duration
-                  : quiz.duration}{" "}
+                {(() => {
+                  // Calculate duration here to keep it isolated
+                  return quiz.difficultySettings?.[selectedDifficulty as keyof typeof quiz.difficultySettings]?.duration || 
+                    (selectedDifficulty === "easy" ? 45 : 
+                     selectedDifficulty === "medium" ? 30 : 
+                     selectedDifficulty === "hard" ? 20 : 30);
+                })()}{" "}
                 minutes
               </p>
-              {quiz.difficultySettings &&
-                quiz.difficultySettings[
-                  selectedDifficulty as keyof typeof quiz.difficultySettings
-                ]?.pointsMultiplier &&
-                quiz.difficultySettings[
-                  selectedDifficulty as keyof typeof quiz.difficultySettings
-                ]!.pointsMultiplier !== 1 && (
+              {quiz.difficultySettings?.[selectedDifficulty as keyof typeof quiz.difficultySettings]?.pointsMultiplier && 
+                quiz.difficultySettings[selectedDifficulty as keyof typeof quiz.difficultySettings]!.pointsMultiplier !== 1 && (
                   <p className="text-sm mt-1 text-indigo-700 font-medium">
-                    {
-                      quiz.difficultySettings[
-                        selectedDifficulty as keyof typeof quiz.difficultySettings
-                      ]!.pointsMultiplier
-                    }
+                    {quiz.difficultySettings[selectedDifficulty as keyof typeof quiz.difficultySettings]!.pointsMultiplier}
                     x points multiplier
                   </p>
                 )}
@@ -1502,6 +1535,7 @@ export default function QuizPage({
                 availableDifficulties={availableDifficulties}
                 selectedDifficulty={selectedDifficulty}
                 onSelectDifficulty={handleDifficultySelect}
+                difficultySettings={quiz?.difficultySettings}
               />
               {isLoadingQuestions && (
                 <div className="flex items-center justify-center mt-2">
@@ -1520,19 +1554,14 @@ export default function QuizPage({
               <li>Ensure you have a stable internet connection</li>
               <li>
                 You will have{" "}
-                {quiz.difficultySettings &&
-                quiz.difficultySettings[
-                  selectedDifficulty as keyof typeof quiz.difficultySettings
-                ]?.duration
-                  ? quiz.difficultySettings[
-                      selectedDifficulty as keyof typeof quiz.difficultySettings
-                    ]!.duration
-                  : quiz.duration}{" "}
+                {(() => {
+                  const duration = quiz?.difficultySettings?.[selectedDifficulty as keyof typeof quiz.difficultySettings]?.duration ||
+                    (selectedDifficulty === "easy" ? 45 : selectedDifficulty === "medium" ? 30 : 20);
+                  return duration;
+                })()}{" "}
                 minutes to complete the quiz
               </li>
-              <li>
-                Quiz has {quiz.questions?.length || 0} questions to answer
-              </li>
+              <li>Quiz has {quiz.questions?.length || 0} questions to answer</li>
               <li>
                 Selected difficulty:{" "}
                 <span className="font-medium capitalize">

@@ -12,11 +12,11 @@ export function getDifficultyDuration(
   difficulty: string
 ): number {
   if (!quiz) {
+    console.log(`[getDifficultyDuration] No quiz provided, using default 30 minutes`);
     return 30; // Default duration if no quiz is provided
   }
 
-  const defaultDuration = quiz.duration || 30; // Default to 30 minutes if quiz.duration is not set
-
+  // Check for specific difficulty settings first
   if (
     quiz.difficultySettings &&
     quiz.difficultySettings[
@@ -25,13 +25,28 @@ export function getDifficultyDuration(
     quiz.difficultySettings[difficulty as keyof typeof quiz.difficultySettings]
       ?.duration
   ) {
-    return quiz.difficultySettings[
+    const specificDuration = quiz.difficultySettings[
       difficulty as keyof typeof quiz.difficultySettings
     ]!.duration;
+    console.log(`[getDifficultyDuration] Using specific ${difficulty} duration: ${specificDuration} minutes`);
+    return specificDuration;
   }
 
-  // Fall back to the quiz's general duration
-  return defaultDuration;
+  // Set default durations based on difficulty level if no specific settings
+  if (difficulty === "easy") {
+    console.log(`[getDifficultyDuration] Using default easy duration: 45 minutes`);
+    return 45; // Default easy duration
+  } else if (difficulty === "medium") {
+    console.log(`[getDifficultyDuration] Using default medium duration: 30 minutes`);
+    return 30; // Default medium duration
+  } else if (difficulty === "hard") {
+    console.log(`[getDifficultyDuration] Using default hard duration: 20 minutes`);
+    return 20; // Default hard duration
+  }
+
+  // Last resort fallback - should rarely get here
+  console.log(`[getDifficultyDuration] Using fallback duration: 30 minutes`);
+  return 30; // Ultimate fallback duration
 }
 
 /**
