@@ -117,6 +117,38 @@ export default function QuizPage({
           setError("Quiz not found or no longer active");
           return;
         }
+        
+        // Debug the quiz data with detailed information about difficulty settings
+        console.log("=== QUIZ DATA DEBUG INFO ===");
+        console.log(`Quiz ID: ${quizData.id}`);
+        console.log(`Base duration: ${quizData.duration} minutes`);
+        console.log(`Available difficulties: ${quizData.availableDifficulties?.join(", ") || "none"}`);
+        
+        if (quizData.difficultySettings) {
+          console.log("Difficulty Settings:");
+          for (const [diff, settings] of Object.entries(quizData.difficultySettings)) {
+            console.log(`- ${diff}: ${settings?.duration} mins, ${settings?.pointsMultiplier}x points`);
+          }
+        } else {
+          console.log("No difficulty settings available, will use base duration fallback");
+        }
+        console.log("===========================")
+
+        // Debug the quiz data with detailed information about difficulty settings
+        console.log("=== QUIZ DATA DEBUG INFO ===");
+        console.log(`Quiz ID: ${quizData.id}`);
+        console.log(`Base duration: ${quizData.duration} minutes`);
+        console.log(`Available difficulties: ${quizData.availableDifficulties?.join(", ") || "none"}`);
+        
+        if (quizData.difficultySettings) {
+          console.log("Difficulty Settings:");
+          for (const [diff, settings] of Object.entries(quizData.difficultySettings)) {
+            console.log(`- ${diff}: ${settings.duration} mins, ${settings.pointsMultiplier}x points`);
+          }
+        } else {
+          console.log("No difficulty settings available, will use base duration fallback");
+        }
+        console.log("===========================");
 
         // Set available difficulties if they exist in quiz data
         if (
@@ -451,11 +483,9 @@ export default function QuizPage({
   useEffect(() => {
     // This effect now only handles logging the difficulty duration
     if (quizStarted && quiz && !quizSubmitted) {
-      // Calculate duration once using optional chaining for cleaner code
-      const quizDuration = quiz.difficultySettings?.[selectedDifficulty as keyof typeof quiz.difficultySettings]?.duration ||
-        (selectedDifficulty === "easy" ? 45 : 
-         selectedDifficulty === "medium" ? 30 : 
-         selectedDifficulty === "hard" ? 20 : 30);
+      // Use specific difficulty settings or fall back to the quiz's base duration
+      const quizDuration = quiz.difficultySettings?.[selectedDifficulty as keyof typeof quiz.difficultySettings]?.duration || 
+        quiz.duration || 30; // Fallback to base duration, or 30 minutes as last resort
       
       console.log(
         `Using ${selectedDifficulty} difficulty duration: ${quizDuration} minutes`
@@ -466,11 +496,9 @@ export default function QuizPage({
   // Effect to show a notification when difficulty changes and clear it after a few seconds
   useEffect(() => {
     if (quizStarted && quiz) {
-      // Calculate duration once using optional chaining
-      const duration = quiz.difficultySettings?.[selectedDifficulty as keyof typeof quiz.difficultySettings]?.duration ||
-        (selectedDifficulty === "easy" ? 45 : 
-         selectedDifficulty === "medium" ? 30 : 
-         selectedDifficulty === "hard" ? 20 : 30);
+      // Use specific difficulty settings or fall back to the quiz's base duration
+      const duration = quiz.difficultySettings?.[selectedDifficulty as keyof typeof quiz.difficultySettings]?.duration || 
+        quiz.duration || 30; // Fallback to base duration, or 30 minutes as last resort
       
       setDifficultyChangeNotice(`Time adjusted to ${duration} minutes for ${selectedDifficulty} difficulty`);
       
@@ -496,11 +524,9 @@ export default function QuizPage({
 
     // Reset the timer based on the new difficulty's duration
     if (quiz) {
-      // Get duration directly from settings or use defaults
+      // Use specific difficulty settings or fall back to the quiz's base duration
       const newDuration = quiz.difficultySettings?.[difficulty as keyof typeof quiz.difficultySettings]?.duration || 
-        (difficulty === "easy" ? 45 : 
-         difficulty === "medium" ? 30 : 
-         difficulty === "hard" ? 20 : 30);
+        quiz.duration || 30; // Fallback to base duration, or 30 minutes as last resort
       
       console.log(`Resetting timer for ${difficulty} difficulty: ${newDuration} minutes`);
       
@@ -567,11 +593,9 @@ export default function QuizPage({
 
     // Set the timer based on the selected difficulty
     if (quiz) {
-      // Calculate duration directly to avoid function call
-      const duration = quiz.difficultySettings?.[selectedDifficulty as keyof typeof quiz.difficultySettings]?.duration ||
-        (selectedDifficulty === "easy" ? 45 : 
-         selectedDifficulty === "medium" ? 30 : 
-         selectedDifficulty === "hard" ? 20 : 30);
+      // Use specific difficulty settings or fall back to the quiz's base duration
+      const duration = quiz.difficultySettings?.[selectedDifficulty as keyof typeof quiz.difficultySettings]?.duration || 
+        quiz.duration || 30; // Fallback to base duration, or 30 minutes as last resort
       
       console.log(`Starting quiz with ${selectedDifficulty} difficulty: ${duration} minutes`);
       // Convert minutes to seconds for the timer
@@ -908,24 +932,11 @@ export default function QuizPage({
             "quizResponses",
             JSON.stringify(existingResponses)
           );
-          console.log("Quiz response saved locally with ID:", localResponseId);
-        } catch (localStorageError) {
-          console.error("Failed to save to local storage:", localStorageError);
+          console.log("Quiz response saved locally with ID", localResponseId);
+        } catch (e) {
+          console.error("Error saving quiz response locally:", e);
         }
       }
-
-      console.log(
-        "DEBUG - About to set quizSubmitted to true with score:",
-        score
-      );
-      setQuizSubmitted(true);
-
-      // Debug: Log the score immediately after setting quizSubmitted
-      setTimeout(() => {
-        console.log("DEBUG - After setting quizSubmitted, score is:", score);
-      }, 0);
-    } catch (error) {
-      console.error("Error processing quiz submission:", error);
       // Show error but still allow viewing results
       console.log(
         "DEBUG - Setting quizSubmitted to true after error, score:",
@@ -1536,6 +1547,7 @@ export default function QuizPage({
                 selectedDifficulty={selectedDifficulty}
                 onSelectDifficulty={handleDifficultySelect}
                 difficultySettings={quiz?.difficultySettings}
+                baseDuration={quiz?.duration || 30} // Pass the quiz's base duration or fallback to 30
               />
               {isLoadingQuestions && (
                 <div className="flex items-center justify-center mt-2">
@@ -1555,8 +1567,9 @@ export default function QuizPage({
               <li>
                 You will have{" "}
                 {(() => {
+                  // Use difficulty-specific duration, fall back to base duration, then 30 min as last resort
                   const duration = quiz?.difficultySettings?.[selectedDifficulty as keyof typeof quiz.difficultySettings]?.duration ||
-                    (selectedDifficulty === "easy" ? 45 : selectedDifficulty === "medium" ? 30 : 20);
+                    quiz.duration || 30;
                   return duration;
                 })()}{" "}
                 minutes to complete the quiz

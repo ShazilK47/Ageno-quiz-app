@@ -141,3 +141,40 @@ vercel deploy
 ## 📜 License
 
 MIT License © 2025 Agenoverse
+
+---
+
+## 🔠 Multi-Difficulty Quiz Support
+
+AgenoQuiz features a robust difficulty system that allows quiz creators to:
+
+- Set up multiple difficulty levels (easy, medium, hard)
+- Define custom time limits for each difficulty
+- Assign point multipliers to reward challenging difficulty selection
+- Customize which difficulties are available per quiz
+
+### Key Components:
+
+- **Difficulty Settings UI**: Admin can configure time limits and point multipliers
+- **Difficulty Selection**: Quiz takers can choose their preferred difficulty level
+- **Adaptive Scoring**: Scores are adjusted based on the selected difficulty
+- **Flexible Timing**: Timer automatically adjusts to match the selected difficulty
+
+### Helper Functions:
+
+We provide a set of utility functions in `utils/difficulty-helpers.ts` to handle difficulty-related logic:
+
+```typescript
+// Get duration for a specific difficulty
+const duration = getDifficultyDuration(quiz, "hard"); // Returns duration in minutes
+
+// Apply difficulty multiplier to score
+const finalScore = applyDifficultyMultiplier(rawScore, quiz, "hard");
+
+// Get formatted difficulty info for display
+const info = getDifficultyDisplayInfo(quiz, "medium");
+console.log(info.duration); // "30 minutes"
+console.log(info.multiplier); // "1.5x"
+```
+
+For detailed documentation, see [Difficulty Settings documentation](./docs/DifficultySettings.md) and [Difficulty Helpers documentation](./docs/DifficultyHelpers.md).

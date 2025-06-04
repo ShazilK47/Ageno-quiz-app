@@ -11,6 +11,7 @@ interface DifficultySelectProps {
       pointsMultiplier: number;
     };
   };
+  baseDuration?: number; // Add the quiz's base duration as a prop
 }
 
 const DifficultySelect: React.FC<DifficultySelectProps> = ({
@@ -18,6 +19,7 @@ const DifficultySelect: React.FC<DifficultySelectProps> = ({
   selectedDifficulty,
   onSelectDifficulty,
   difficultySettings,
+  baseDuration = 30, // Default to 30 minutes if not provided
 }) => {
   // Ensure default selection if none provided
   useEffect(() => {
@@ -37,16 +39,18 @@ const DifficultySelect: React.FC<DifficultySelectProps> = ({
       );
     }
   }, [selectedDifficulty, availableDifficulties, onSelectDifficulty]);
-
   // Generate difficulty information with custom time and points based on settings
   const difficultyInfo = useMemo(() => {
+    // Log to debug the settings
+    console.log('[DIFFICULTY-SELECT] Rendering with settings:', { difficultySettings, baseDuration });
+    
     const baseInfo = {
       easy: {
         color: "green",
         label: "Easy",
         timeLabel: difficultySettings?.easy 
           ? `${difficultySettings.easy.duration} mins` 
-          : "More time",
+          : `${baseDuration} mins`, // Use base duration instead of vague text
         pointsLabel: difficultySettings?.easy 
           ? `${difficultySettings.easy.pointsMultiplier}x points` 
           : "1.0x points",
@@ -57,7 +61,7 @@ const DifficultySelect: React.FC<DifficultySelectProps> = ({
         label: "Medium",
         timeLabel: difficultySettings?.medium 
           ? `${difficultySettings.medium.duration} mins` 
-          : "Standard time",
+          : `${baseDuration} mins`, // Use base duration instead of vague text
         pointsLabel: difficultySettings?.medium 
           ? `${difficultySettings.medium.pointsMultiplier}x points` 
           : "1.5x points",
@@ -68,16 +72,15 @@ const DifficultySelect: React.FC<DifficultySelectProps> = ({
         label: "Hard",
         timeLabel: difficultySettings?.hard 
           ? `${difficultySettings.hard.duration} mins` 
-          : "Less time",
+          : `${baseDuration} mins`, // Use base duration instead of vague text
         pointsLabel: difficultySettings?.hard 
           ? `${difficultySettings.hard.pointsMultiplier}x points` 
           : "2.0x points",
         description: "For experts only",
       },
     };
-    
-    return baseInfo;
-  }, [difficultySettings]);
+      return baseInfo;
+  }, [difficultySettings, baseDuration]);
 
   return (
     <div className="mb-6">

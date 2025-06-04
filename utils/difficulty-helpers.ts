@@ -31,21 +31,14 @@ export function getDifficultyDuration(
     console.log(`[getDifficultyDuration] Using specific ${difficulty} duration: ${specificDuration} minutes`);
     return specificDuration;
   }
-
-  // Set default durations based on difficulty level if no specific settings
-  if (difficulty === "easy") {
-    console.log(`[getDifficultyDuration] Using default easy duration: 45 minutes`);
-    return 45; // Default easy duration
-  } else if (difficulty === "medium") {
-    console.log(`[getDifficultyDuration] Using default medium duration: 30 minutes`);
-    return 30; // Default medium duration
-  } else if (difficulty === "hard") {
-    console.log(`[getDifficultyDuration] Using default hard duration: 20 minutes`);
-    return 20; // Default hard duration
+  // Use the quiz's base duration as the fallback
+  if (quiz.duration) {
+    console.log(`[getDifficultyDuration] Using quiz base duration: ${quiz.duration} minutes for ${difficulty}`);
+    return quiz.duration;
   }
 
-  // Last resort fallback - should rarely get here
-  console.log(`[getDifficultyDuration] Using fallback duration: 30 minutes`);
+  // Last resort fallback - should rarely get here, only if quiz.duration is missing
+  console.log(`[getDifficultyDuration] Using default fallback duration: 30 minutes`);
   return 30; // Ultimate fallback duration
 }
 
@@ -112,10 +105,11 @@ export function hasMultipleDifficulties(quiz: Quiz | null): boolean {
 }
 
 /**
- * Gets difficulty details for display in UI
- * @param quiz The quiz object
- * @param difficulty The selected difficulty level
- * @returns Object containing formatted duration and multiplier info
+ * Gets formatted difficulty details for display in UI components
+ * @param quiz The quiz object containing difficulty settings
+ * @param difficulty The selected difficulty level (easy, medium, hard)
+ * @returns Object containing formatted duration (e.g. "30 minutes"), 
+ *          multiplier (e.g. "1.5x"), and whether custom settings exist for this difficulty
  */
 export function getDifficultyDisplayInfo(
   quiz: Quiz | null,
@@ -143,4 +137,23 @@ export function getDifficultyDisplayInfo(
     multiplier: `${multiplier}x`,
     hasCustomSettings,
   };
+}
+
+/**
+ * Gets the recommended default difficulty level for a quiz
+ * @param quiz The quiz object
+ * @returns The recommended difficulty level (prefers 'medium' if available)
+ */
+export function getRecommendedDifficulty(quiz: Quiz | null): string {
+  if (!quiz || !quiz.availableDifficulties || quiz.availableDifficulties.length === 0) {
+    return 'medium'; // Default fallback if no available difficulties
+  }
+
+  // Prefer medium difficulty if available
+  if (quiz.availableDifficulties.includes('medium')) {
+    return 'medium';
+  }
+  
+  // Otherwise, use the first available difficulty
+  return quiz.availableDifficulties[0];
 }

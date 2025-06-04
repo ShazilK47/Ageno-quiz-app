@@ -124,6 +124,7 @@ export const quizConverter = {
         "medium",
         "hard",
       ], // Default to all difficulties
+      difficultySettings: data.difficultySettings || {}, // Include difficulty settings from Firestore
     };
   },
 };
