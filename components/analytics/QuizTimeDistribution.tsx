@@ -1,95 +1,167 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useRef } from "react";
+import Chart from "chart.js/auto";
+import { QuizResponse } from "@/types/quiz";
 
 interface QuizTimeDistributionProps {
-  attempts: {
-    id: string;
-    timeSpent: number;
-  }[];
-  title?: string;
+  responses: QuizResponse[];
 }
 
 export default function QuizTimeDistribution({
-  attempts,
-  title = "Completion Time Distribution",
+  responses,
 }: QuizTimeDistributionProps) {
-  const [distribution, setDistribution] = useState<Record<string, number>>({});
-
+  const chartRef = useRef<HTMLCanvasElement>(null);
+  const chartInstance = useRef<Chart | null>(null);
   useEffect(() => {
-    if (!attempts?.length) return;
+    if (!chartRef.current || responses.length === 0) return;
+
+    // Clean up any existing chart
+    if (chartInstance.current) {
+      chartInstance.current.destroy();
+    }
 
     // Calculate time ranges (in seconds)
     const ranges = {
       "< 1 min": 0,
-      "1-2 min": 0,
-      "2-5 min": 0,
+      "1-3 min": 0,
+      "3-5 min": 0,
       "5-10 min": 0,
       "> 10 min": 0,
     };
 
-    attempts.forEach((attempt) => {
-      const timeInSeconds = attempt.timeSpent || 0;
+    responses.forEach((response) => {
+      if (!response.startedAt || !response.submittedAt) return;
+
+      let startTime: Date;
+      if (typeof response.startedAt === "number") {
+        startTime = new Date(response.startedAt);
+      } else if (response.startedAt instanceof Date) {
+        startTime = response.startedAt;
+      } else if (
+        "toDate" in response.startedAt &&
+        typeof response.startedAt.toDate === "function"
+      ) {
+        startTime = response.startedAt.toDate();
+      } else {
+        // Handle other cases or use a fallback
+        return;
+      }
+
+      let endTime: Date;
+      if (typeof response.submittedAt === "number") {
+        endTime = new Date(response.submittedAt);
+      } else if (response.submittedAt instanceof Date) {
+        endTime = response.submittedAt;
+      } else if (
+        "toDate" in response.submittedAt &&
+        typeof response.submittedAt.toDate === "function"
+      ) {
+        endTime = response.submittedAt.toDate();
+      } else {
+        // Handle other cases or use a fallback
+        return;
+      }
+
+      const timeInSeconds = Math.floor(
+        (endTime.getTime() - startTime.getTime()) / 1000
+      );
 
       if (timeInSeconds < 60) ranges["< 1 min"]++;
-      else if (timeInSeconds < 120) ranges["1-2 min"]++;
-      else if (timeInSeconds < 300) ranges["2-5 min"]++;
+      else if (timeInSeconds < 180) ranges["1-3 min"]++;
+      else if (timeInSeconds < 300) ranges["3-5 min"]++;
       else if (timeInSeconds < 600) ranges["5-10 min"]++;
       else ranges["> 10 min"]++;
     });
 
-    setDistribution(ranges);
-  }, [attempts]);
+    // Create the chart
+    const ctx = chartRef.current.getContext("2d");
 
-  const formatTimeBracket = (bracket: string) => {
-    return bracket;
-  };
+    if (ctx) {
+      chartInstance.current = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: Object.keys(ranges),
+          datasets: [
+            {
+              label: "Number of Attempts",
+              data: Object.values(ranges),
+              backgroundColor: [
+                "rgba(75, 192, 192, 0.7)", // Teal
+                "rgba(54, 162, 235, 0.7)", // Blue
+                "rgba(153, 102, 255, 0.7)", // Purple
+                "rgba(255, 159, 64, 0.7)", // Orange
+                "rgba(255, 99, 132, 0.7)", // Red
+              ],
+              borderColor: [
+                "rgb(75, 192, 192)",
+                "rgb(54, 162, 235)",
+                "rgb(153, 102, 255)",
+                "rgb(255, 159, 64)",
+                "rgb(255, 99, 132)",
+              ],
+              borderWidth: 1,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: "Quiz Completion Time",
+            },
+            legend: {
+              display: false,
+            },
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  return `${context.parsed.y} attempt${
+                    context.parsed.y !== 1 ? "s" : ""
+                  }`;
+                },
+              },
+            },
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                precision: 0,
+              },
+              title: {
+                display: true,
+                text: "Number of Attempts",
+              },
+            },
+            x: {
+              title: {
+                display: true,
+                text: "Time Taken",
+              },
+            },
+          },
+        },
+      });
+    }
 
+    return () => {
+      if (chartInstance.current) {
+        chartInstance.current.destroy();
+      }
+    };
+  }, [responses]);
+
+  if (responses.length === 0) {
+    return (
+      <div className="p-4 text-center text-gray-500">No data available</div>
+    );
+  }
   return (
-    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
-
-      <div className="space-y-4">
-        {Object.entries(distribution).map(([range, count]) => {
-          // Calculate percentage for bar width
-          const percentage = attempts?.length
-            ? Math.round((count / attempts.length) * 100)
-            : 0;
-
-          // Use a gradient from blue (fast) to purple (slow)
-          let barColor;
-          if (range === "< 1 min") barColor = "bg-blue-500";
-          else if (range === "1-2 min") barColor = "bg-blue-600";
-          else if (range === "2-5 min") barColor = "bg-indigo-500";
-          else if (range === "5-10 min") barColor = "bg-purple-500";
-          else barColor = "bg-purple-600";
-
-          return (
-            <div key={range} className="space-y-1">
-              <div className="flex justify-between text-sm">
-                <span className="font-medium text-gray-700">
-                  {formatTimeBracket(range)}
-                </span>
-                <span className="text-gray-500">
-                  {count} attempt{count !== 1 ? "s" : ""}
-                </span>
-              </div>
-              <div className="h-4 w-full bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className={`h-full ${barColor}`}
-                  style={{ width: `${percentage}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {!attempts?.length && (
-        <div className="text-center py-6 text-gray-500">
-          No data available for time distribution
-        </div>
-      )}
+    <div style={{ height: "300px" }}>
+      <canvas ref={chartRef} />
     </div>
   );
 }

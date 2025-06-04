@@ -121,6 +121,56 @@ export default function QuizCard({ quiz }: QuizCardProps) {
             </div>
 
             <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-4 flex items-center shadow-sm border border-gray-100">
+              <div
+                className={`rounded-full p-2 mr-3 ${
+                  quiz.difficulty === "easy"
+                    ? "bg-green-100"
+                    : quiz.difficulty === "hard"
+                    ? "bg-red-100"
+                    : "bg-yellow-100"
+                }`}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className={`${
+                    quiz.difficulty === "easy"
+                      ? "text-green-600"
+                      : quiz.difficulty === "hard"
+                      ? "text-red-600"
+                      : "text-yellow-600"
+                  }`}
+                >
+                  <path
+                    d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M7 7L7.01 7"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500">Difficulty</p>
+                <p className="text-sm font-semibold text-gray-800">
+                  {quiz.difficulty
+                    ? quiz.difficulty.charAt(0).toUpperCase() +
+                      quiz.difficulty.slice(1)
+                    : "Medium"}
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-4 flex items-center shadow-sm border border-gray-100">
               <div className="rounded-full bg-indigo-100 p-2 mr-3">
                 <svg
                   width="18"

@@ -1,17 +1,10 @@
 "use client";
 
 import React from "react";
+import { QuizResponse } from "@/types/quiz";
 
 interface QuizMetricsProps {
-  attempts: {
-    id: string;
-    score: number;
-    totalQuestions: number;
-    timeSpent: number;
-    percentageScore?: number;
-    quizTitle?: string;
-    quizId?: string;
-  }[];
+  attempts: QuizResponse[];
   className?: string;
 }
 
@@ -20,6 +13,18 @@ export default function QuizMetrics({
   className = "",
 }: QuizMetricsProps) {
   if (!attempts || attempts.length === 0) return null;
+
+  interface QuizMetricsData {
+    quizId: string;
+    quizTitle: string;
+    attemptCount: number;
+    totalScore: number;
+    totalTime: number;
+    passingCount: number;
+    avgScore?: number;
+    avgTime?: number;
+    passRate?: number;
+  }
 
   // Group attempts by quiz
   const quizData = attempts.reduce((acc, attempt) => {
@@ -44,17 +49,17 @@ export default function QuizMetrics({
     }
 
     return acc;
-  }, {} as Record<string, any>);
+  }, {} as Record<string, QuizMetricsData>);
 
   // Convert to array and sort by attempt count
   const quizMetrics = Object.values(quizData)
-    .map((quiz: any) => ({
+    .map((quiz) => ({
       ...quiz,
       avgScore: Math.round(quiz.totalScore / quiz.attemptCount),
       avgTime: Math.round(quiz.totalTime / quiz.attemptCount),
       passRate: Math.round((quiz.passingCount / quiz.attemptCount) * 100),
     }))
-    .sort((a: any, b: any) => b.attemptCount - a.attemptCount);
+    .sort((a, b) => b.attemptCount - a.attemptCount);
 
   // Calculate total statistics
   const totalAttempts = attempts.length;
@@ -150,7 +155,7 @@ export default function QuizMetrics({
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {quizMetrics.map((quiz: any) => (
+                {quizMetrics.map((quiz) => (
                   <tr key={quiz.quizId} className="hover:bg-gray-50">
                     <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
                       {quiz.quizTitle}

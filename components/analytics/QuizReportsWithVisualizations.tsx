@@ -1,14 +1,21 @@
 import React from "react";
 import QuizScoreDistribution from "./QuizScoreDistribution";
 import QuizTimeDistribution from "./QuizTimeDistribution";
+import { QuizResponse } from "@/types/quiz";
 
-export default function QuizReportsWithVisualizations() {
+interface QuizReportsWithVisualizationsProps {
+  responses: QuizResponse[];
+}
+
+export default function QuizReportsWithVisualizations({
+  responses,
+}: QuizReportsWithVisualizationsProps) {
   return (
     <div>
       {/* Insert the visualization components just after the performance summary */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <QuizScoreDistribution attempts={filteredAttempts} />
-        <QuizTimeDistribution attempts={filteredAttempts} />
+        <QuizScoreDistribution responses={responses} />
+        <QuizTimeDistribution responses={responses} />
       </div>
     </div>
   );

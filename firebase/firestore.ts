@@ -30,7 +30,8 @@ export interface Quiz {
   accessCode: string;
   requiresAccessCode?: boolean; // Flag to indicate if access code is required
   questions?: QuizQuestion[];
-  // New fields for difficulty levels
+  difficulty?: "easy" | "medium" | "hard"; // Main difficulty level for the quiz
+  // New fields for advanced difficulty levels
   availableDifficulties?: string[]; // ["easy", "medium", "hard"]
   // Settings for each difficulty level
   difficultySettings?: {

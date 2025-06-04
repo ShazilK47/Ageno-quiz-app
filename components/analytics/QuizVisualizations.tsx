@@ -4,17 +4,10 @@ import React from "react";
 import QuizScoreDistribution from "@/components/analytics/QuizScoreDistribution";
 import QuizTimeDistribution from "@/components/analytics/QuizTimeDistribution";
 import QuizMetrics from "@/components/analytics/QuizMetrics";
+import { QuizResponse } from "@/types/quiz";
 
 interface QuizVisualizationsProps {
-  attempts: {
-    id: string;
-    score: number;
-    totalQuestions: number;
-    timeSpent: number;
-    percentageScore?: number;
-    quizTitle?: string;
-    quizId?: string;
-  }[];
+  attempts: QuizResponse[];
   className?: string;
 }
 
@@ -76,14 +69,14 @@ export default function QuizVisualizations({
             </>
           )}
         </button>
-      </div>
-
+      </div>{" "}
       {showCharts && (
         <>
+          {" "}
           <QuizMetrics attempts={attempts} className="mb-6" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <QuizScoreDistribution attempts={attempts} />
-            <QuizTimeDistribution attempts={attempts} />
+            <QuizScoreDistribution responses={attempts} />
+            <QuizTimeDistribution responses={attempts} />
           </div>
         </>
       )}
