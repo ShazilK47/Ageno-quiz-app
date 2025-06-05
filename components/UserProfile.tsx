@@ -30,16 +30,16 @@ export default function UserProfile({ isMobile = false }: UserProfileProps) {
   if (!user) {
     if (isMobile) {
       return (
-        <div className="space-y-2">
+        <div className="space-y-3 px-1 py-1">
           <Link
             href="/sign-in"
-            className="block w-full text-center py-2 px-4 rounded-md bg-accent-primary text-white text-sm font-medium hover:bg-accent-primary/90 transition"
+            className="block w-full text-center py-2.5 px-4 rounded-full bg-gradient-to-r from-purple-600 via-purple-500 to-blue-500 text-white text-sm font-medium hover:shadow-lg hover:from-purple-500 hover:to-blue-600 transition-all duration-300"
           >
             Sign In
           </Link>
           <Link
             href="/sign-up"
-            className="block w-full text-center py-2 px-4 rounded-md border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition"
+            className="block w-full text-center py-2.5 px-4 rounded-full border-2 border-purple-600 text-purple-600 text-sm font-medium hover:text-purple-700 hover:border-purple-700 hover:bg-purple-50 hover:shadow-md transition-all duration-300"
           >
             Sign Up
           </Link>
@@ -51,13 +51,14 @@ export default function UserProfile({ isMobile = false }: UserProfileProps) {
       <div className="flex items-center gap-3">
         <Link
           href="/sign-in"
-          className="text-sm font-medium text-gray-700 hover:text-accent-primary transition"
+          className="text-sm font-medium px-4 py-2 text-purple-600 hover:text-purple-700 transition-all duration-300 relative group"
         >
           Sign In
+          <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-purple-600 group-hover:w-full transition-all duration-300"></span>
         </Link>
         <Link
           href="/sign-up"
-          className="py-2 px-4 rounded-md bg-accent-primary text-white text-sm font-medium hover:bg-accent-primary/90 transition"
+          className="py-2 px-5 rounded-full bg-gradient-to-r from-purple-600 via-purple-500 to-blue-500 text-white text-sm font-medium hover:shadow-lg hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-purple-300 active:translate-y-0 transform transition-all duration-300"
         >
           Sign Up
         </Link>
@@ -72,7 +73,7 @@ export default function UserProfile({ isMobile = false }: UserProfileProps) {
     return (
       <div>
         <div className="flex items-center gap-3 mb-3">
-          <div className="h-10 w-10 rounded-full bg-gradient-to-r from-purple-primary to-tech-blue-light flex items-center justify-center text-white font-bold">
+          <div className="h-10 w-10 rounded-full bg-gradient-to-r from-purple-600 to-blue-500 flex items-center justify-center text-white font-bold shadow-md">
             {displayName.charAt(0).toUpperCase()}
           </div>
           <div className="flex flex-col">
@@ -158,7 +159,7 @@ export default function UserProfile({ isMobile = false }: UserProfileProps) {
     <Menu as="div" className="relative inline-block text-left">
       <Menu.Button className="flex items-center gap-2 cursor-pointer group">
         {" "}
-        <div className="h-10 w-10 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold text-lg transition-transform transform group-hover:scale-110">
+        <div className="h-10 w-10 rounded-full bg-gradient-to-r from-purple-600 to-blue-500 flex items-center justify-center text-white font-bold text-lg transition-transform transform group-hover:scale-110 shadow-md">
           {displayName.charAt(0).toUpperCase()}
         </div>
         <div className="hidden md:flex flex-col items-start">
@@ -186,9 +187,9 @@ export default function UserProfile({ isMobile = false }: UserProfileProps) {
                   href="/profile"
                   className={`${
                     active
-                      ? "bg-accent-primary/10 text-accent-primary"
+                      ? "bg-purple-100/80 text-purple-600"
                       : "text-gray-900"
-                  } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
+                  } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-all duration-200`}
                 >
                   <svg
                     className="mr-2 h-5 w-5"

@@ -223,10 +223,10 @@ function NavLink({
   return (
     <Link
       href={href}
-      className="group relative font-medium text-foreground transition-colors duration-300 hover:text-accent-primary"
+      className="group relative font-medium text-foreground transition-colors duration-300 hover:text-purple-600"
     >
       {children}
-      <span className="absolute -bottom-1 left-0 h-0.5 w-0 bg-accent-primary transition-all duration-300 group-hover:w-full"></span>
+      <span className="absolute -bottom-1 left-0 h-0.5 w-0 bg-purple-600 transition-all duration-300 group-hover:w-full"></span>
     </Link>
   );
 }
@@ -245,7 +245,7 @@ function MobileNavLink({
     <Link
       href={href}
       onClick={onClick}
-      className="block py-2 px-2 font-medium text-foreground hover:text-accent-primary transition-colors duration-300 hover:bg-neutral-100 dark:hover:bg-tech-blue-dark rounded-md"
+      className="block py-2 px-2 font-medium text-foreground hover:text-purple-600 transition-colors duration-300 hover:bg-neutral-100 dark:hover:bg-blue-900 rounded-md"
     >
       {children}
     </Link>

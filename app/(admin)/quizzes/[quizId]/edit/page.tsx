@@ -294,7 +294,20 @@ export default function EditQuizPage() {
     }
 
     return true;
-  };// Update the quiz document
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateQuiz()) {
+      return;
+    }
+    
+    setIsSaving(true);
+    setError(null);
+    
+    try {
+      // Update the quiz document
       const quizRef = doc(db, "quizzes", quizId);
       await updateDoc(quizRef, {
         title,

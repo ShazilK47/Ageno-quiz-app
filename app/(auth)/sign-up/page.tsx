@@ -191,10 +191,17 @@ const SignUp = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-neutral-50">
       <Header />
-
-      <main className="container mx-auto px-4 py-12">
+      
+      {/* Background decorative elements */}
+      <div className="fixed inset-0 overflow-hidden z-0 pointer-events-none">
+        <div className="absolute top-1/4 right-[15%] w-72 h-72 rounded-full bg-gradient-to-br from-purple-600/15 to-blue-500/15 blur-3xl animate-pulse-slow"></div>
+        <div className="absolute bottom-1/3 left-[10%] w-96 h-96 rounded-full bg-gradient-to-tr from-purple-200/15 to-blue-500/10 blur-3xl animate-float-slow"></div>
+        <div className="absolute top-2/3 left-[50%] w-64 h-64 rounded-full bg-gradient-to-bl from-purple-300/5 to-indigo-400/10 blur-3xl animate-float-slow-reverse"></div>
+      </div>
+      
+      <main className="container mx-auto px-4 py-12 relative z-10">
         <div className="max-w-md mx-auto">
-          <div className="bg-white p-8 rounded-xl shadow-sm">
+          <div className="p-8 rounded-2xl shadow-lg border border-gray-100 backdrop-blur-sm bg-white/95">
             {checkingSession ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mb-6"></div>
@@ -260,7 +267,7 @@ const SignUp = () => {
                           id="displayName"
                           value={displayName}
                           onChange={(e) => setDisplayName(e.target.value)}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary shadow-sm"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent shadow-sm transition-all duration-300 hover:border-gray-400"
                           placeholder="John Doe"
                           required
                         />
@@ -278,7 +285,7 @@ const SignUp = () => {
                           id="email"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary shadow-sm"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent shadow-sm transition-all duration-300 hover:border-gray-400"
                           placeholder="you@example.com"
                           required
                         />
@@ -296,7 +303,7 @@ const SignUp = () => {
                           id="password"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary shadow-sm"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent shadow-sm transition-all duration-300 hover:border-gray-400"
                           placeholder="••••••••"
                           required
                         />
@@ -336,7 +343,7 @@ const SignUp = () => {
                           id="confirmPassword"
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
-                          className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary shadow-sm ${
+                          className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent shadow-sm transition-all duration-300 hover:border-gray-400 ${
                             confirmPassword && password !== confirmPassword
                               ? "border-red-300"
                               : "border-gray-300"
@@ -359,7 +366,7 @@ const SignUp = () => {
 
                       <button
                         type="submit"
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-8 rounded-lg hover:shadow-md transition-all duration-300 transform hover:-translate-y-1 flex items-center justify-center"
+                        className="w-full bg-gradient-to-r from-purple-600 via-purple-500 to-blue-500 text-white font-medium py-3.5 px-8 rounded-full shadow-md hover:shadow-xl hover:from-purple-500 hover:to-blue-600 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-purple-300 active:translate-y-0 transform transition-all duration-300 flex items-center justify-center"
                         disabled={isLoading}
                       >
                         {isLoading ? (
@@ -414,7 +421,7 @@ const SignUp = () => {
                     </div>
                     <button
                       onClick={handleGoogleSignUp}
-                      className="w-full flex items-center justify-center bg-white border border-gray-300 rounded-lg px-6 py-3 text-sm font-medium text-gray-800 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 mb-4"
+                      className="w-full flex items-center justify-center bg-white border border-gray-300 rounded-full px-6 py-3.5 text-sm font-medium text-gray-800 hover:text-gray-900 hover:border-gray-400 hover:bg-gray-50 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-gray-300 active:bg-gray-100 hover:-translate-y-0.5 transform transition-all duration-300 mb-4"
                       disabled={isLoading}
                     >
                       <svg
@@ -450,9 +457,10 @@ const SignUp = () => {
                         Already have an account?{" "}
                         <Link
                           href="/sign-in"
-                          className="text-blue-600 hover:text-blue-800 font-medium transition"
+                          className="text-purple-600 hover:text-purple-800 font-medium transition-colors relative inline-block group focus:outline-none focus:ring-2 focus:ring-purple-300 focus:ring-offset-1 rounded px-1"
                         >
-                          Sign In
+                          <span>Sign In</span>
+                          <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-purple-600 group-hover:w-full transition-all duration-300"></span>
                         </Link>
                       </p>
                     </div>
