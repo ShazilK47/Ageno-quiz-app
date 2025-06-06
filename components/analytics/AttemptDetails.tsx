@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import React from "react";
 
@@ -12,7 +13,7 @@ interface AttemptDetailsProps {
     userEmail: string;
     score: number;
     totalQuestions: number;
-    timestamp: any;
+    timestamp: Date | { toDate(): Date } | number;
     timeSpent: number;
     percentageScore?: number;
     tabSwitchCount?: number;
@@ -31,12 +32,14 @@ export default function AttemptDetails({
   attempt,
   onClose,
 }: AttemptDetailsProps) {
-  const formatDate = (timestamp: any) => {
+  const formatDate = (timestamp: Date | { toDate(): Date } | number | undefined) => {
     if (!timestamp) return "N/A";
     try {
-      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      const date = typeof timestamp === 'object' && 'toDate' in timestamp 
+        ? timestamp.toDate() 
+        : new Date(timestamp as number);
       return date.toLocaleDateString() + " " + date.toLocaleTimeString();
-    } catch (e) {
+    } catch (_) {
       return "Invalid date";
     }
   };

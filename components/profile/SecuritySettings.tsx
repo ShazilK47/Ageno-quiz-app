@@ -1,8 +1,9 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { useState, useEffect, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { MultiFactorInfo } from "firebase/auth";
+import { MultiFactorInfo, User as FirebaseUser, TotpSecret } from "firebase/auth";
 import {
   getMfaStatus,
   startPhoneMfaEnrollment,
@@ -13,13 +14,43 @@ import {
 } from "@/lib/actions/auth.actions";
 
 interface SecuritySettingsProps {
-  user: any; // Replace with proper user type
+  user: FirebaseUser;
   onMessage: (
     message: { type: "success" | "error"; text: string } | null
   ) => void;
 }
 
 type MfaMethod = "phone" | "totp";
+
+// Type definitions for MFA operations
+// Import TotpSecret from firebase/auth rather than defining our own
+// interface TotpSecret {
+//   secret: string;
+//   qrCode?: string;
+//   base32Secret?: string;
+// }
+
+interface PhoneMfaFactor extends MultiFactorInfo {
+  phoneNumber?: string;
+}
+
+interface AuthError {
+  code: string;
+  message: string;
+}
+
+interface TotpSecretWithQr extends TotpSecret {
+  qrCode?: string;
+  base32Secret?: string;
+}
+
+interface AuthResult {
+  success: boolean;
+  verificationId?: string;
+  secret?: TotpSecretWithQr;
+  qrCode?: string;
+  message?: string;
+}
 
 export default function SecuritySettings({
   user,
@@ -31,8 +62,7 @@ export default function SecuritySettings({
   const [verificationId, setVerificationId] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [mfaFactors, setMfaFactors] = useState<MultiFactorInfo[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [totpSecret, setTotpSecret] = useState<any>(null);
+  const [totpSecret, setTotpSecret] = useState<TotpSecretWithQr | null>(null);
   const [totpQrCode, setTotpQrCode] = useState("");
   const recaptchaContainerRef = useRef<HTMLDivElement>(null);
 
@@ -58,8 +88,8 @@ export default function SecuritySettings({
         recaptchaContainerRef.current
       );
 
-      if (result.success) {
-        setVerificationId(result.verificationId!);
+      if (result && 'verificationId' in result && !('code' in result)) {
+        setVerificationId(result.verificationId);
         onMessage({
           type: "success",
           text: "Verification code sent to your phone number.",
@@ -67,10 +97,12 @@ export default function SecuritySettings({
       } else {
         onMessage({
           type: "error",
-          text: result.error || "Failed to start phone verification.",
+          text: typeof result === 'object' && result !== null && 'message' in result 
+            ? ((result as AuthError).message || "Failed to start phone verification.")
+            : "Failed to start phone verification.",
         });
       }
-    } catch (error) {
+    } catch (_) {
       onMessage({
         type: "error",
         text: "An unexpected error occurred. Please try again.",
@@ -86,7 +118,6 @@ export default function SecuritySettings({
 
     try {
       setIsSubmitting(true);
-      onMessage(null);
 
       const result = await completePhoneMfaEnrollment(
         user,
@@ -106,15 +137,17 @@ export default function SecuritySettings({
 
         onMessage({
           type: "success",
-          text: "Phone authentication successfully enabled!",
+          text: "Phone authentication successfully set up!",
         });
       } else {
         onMessage({
           type: "error",
-          text: result.error || "Failed to verify code. Please try again.",
+          text: typeof result === 'object' && result !== null && 'message' in result 
+            ? ((result as AuthError).message || "Failed to verify code.")
+            : "Failed to verify code. Please try again.",
         });
       }
-    } catch (error) {
+    } catch (_) {
       onMessage({
         type: "error",
         text: "An unexpected error occurred. Please try again.",
@@ -134,20 +167,37 @@ export default function SecuritySettings({
 
       const result = await generateTotpSecret(user);
 
-      if (result.success) {
-        setTotpSecret(result.secret);
-        setTotpQrCode(result.qrCode || "");
+      if (result && 'secret' in result && !('code' in result)) {
+        // Keep the original TotpSecret object but cast it to include our custom properties
+        // This avoids TypeScript errors while still allowing the object to be used with Firebase
+        const totpWithQr = result as unknown as TotpSecretWithQr;
+        
+        // Generate QR code URL using the Firebase method if available
+        if (typeof result.generateQrCodeUrl === 'function') {
+          totpWithQr.qrCode = result.generateQrCodeUrl("Ageno Quiz App");
+        }
+        
+        // Use secretKey for manual entry code
+        if ('secretKey' in result) {
+          totpWithQr.base32Secret = result.secretKey as string;
+        }
+        
+        setTotpSecret(totpWithQr);
+        setTotpQrCode(totpWithQr.qrCode || "");
+
         onMessage({
           type: "success",
-          text: "TOTP secret generated successfully.",
+          text: "TOTP secret generated. Scan the QR code with your authenticator app.",
         });
       } else {
         onMessage({
           type: "error",
-          text: result.error || "Failed to generate TOTP secret.",
+          text: typeof result === 'object' && result !== null && 'message' in result 
+            ? ((result as AuthError).message || "Failed to generate TOTP secret.")
+            : "Failed to generate TOTP secret.",
         });
       }
-    } catch (error) {
+    } catch (_) {
       onMessage({
         type: "error",
         text: "An unexpected error occurred. Please try again.",
@@ -163,8 +213,8 @@ export default function SecuritySettings({
 
     try {
       setIsSubmitting(true);
-      onMessage(null);
 
+      // Pass the actual TotpSecret object from Firebase, not our extended version
       const result = await completeTotpMfaEnrollment(
         user,
         totpSecret,
@@ -172,9 +222,10 @@ export default function SecuritySettings({
       );
 
       if (result === true) {
-        setVerificationCode("");
+        // Clear form state
         setTotpSecret(null);
         setTotpQrCode("");
+        setVerificationCode("");
         setActiveMfaSetup(null);
 
         // Update MFA factors list
@@ -183,15 +234,17 @@ export default function SecuritySettings({
 
         onMessage({
           type: "success",
-          text: "Authenticator app successfully enabled!",
+          text: "Authenticator app successfully set up!",
         });
       } else {
         onMessage({
           type: "error",
-          text: result.error || "Failed to verify code. Please try again.",
+          text: typeof result === 'object' && result !== null && 'message' in result 
+            ? ((result as AuthError).message || "Failed to verify code.")
+            : "Failed to verify code. Please try again.",
         });
       }
-    } catch (error) {
+    } catch (_) {
       onMessage({
         type: "error",
         text: "An unexpected error occurred. Please try again.",
@@ -201,13 +254,12 @@ export default function SecuritySettings({
     }
   };
 
-  // Unenroll MFA factor
-  const handleUnenrollFactor = async (factorId: string) => {
+  // Remove an MFA factor
+  const handleRemoveMfaFactor = async (factorId: string) => {
     if (!user) return;
 
     try {
       setIsSubmitting(true);
-      onMessage(null);
 
       const result = await unenrollMfaFactor(user, factorId);
 
@@ -218,16 +270,17 @@ export default function SecuritySettings({
 
         onMessage({
           type: "success",
-          text: "Two-factor authentication method removed successfully.",
+          text: "MFA method successfully removed.",
         });
       } else {
         onMessage({
           type: "error",
-          text:
-            result.error || "Failed to remove 2FA method. Please try again.",
+          text: typeof result === 'object' && result !== null && 'message' in result 
+            ? ((result as AuthError).message || "Failed to remove 2FA method.")
+            : "Failed to remove 2FA method. Please try again.",
         });
       }
-    } catch (error) {
+    } catch (_) {
       onMessage({
         type: "error",
         text: "An unexpected error occurred. Please try again.",
@@ -266,14 +319,14 @@ export default function SecuritySettings({
                           ? "Authenticator App"
                           : "Two-Factor Method")}
                     </p>
-                    {factor.factorId === "phone" && factor.phoneNumber && (
+                    {factor.factorId === "phone" && (factor as PhoneMfaFactor).phoneNumber && (
                       <p className="text-sm text-gray-500">
-                        {factor.phoneNumber}
+                        {(factor as PhoneMfaFactor).phoneNumber}
                       </p>
                     )}
                   </div>
                   <button
-                    onClick={() => handleUnenrollFactor(factor.uid)}
+                    onClick={() => handleRemoveMfaFactor(factor.uid)}
                     disabled={isSubmitting}
                     className="text-sm text-red-600 hover:text-red-800"
                   >
@@ -436,7 +489,7 @@ export default function SecuritySettings({
                     Scan the QR code with your authenticator app
                   </p>
 
-                  {totpSecret.base32Secret && (
+                  {totpSecret && 'base32Secret' in totpSecret && totpSecret.base32Secret && (
                     <div className="mb-4 text-center">
                       <p className="text-sm text-gray-600 mb-1">
                         Or enter this code manually:

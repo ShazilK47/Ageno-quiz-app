@@ -5,9 +5,10 @@ import {
   updateUserEmail,
   sendVerificationEmail,
 } from "@/lib/actions/auth.actions";
+import { User as FirebaseUser } from "firebase/auth";
 
 interface EmailSettingsProps {
-  user: any; // Replace with proper user type
+  user: FirebaseUser;
   onMessage: (
     message: { type: "success" | "error"; text: string } | null
   ) => void;
@@ -39,15 +40,18 @@ export default function EmailSettings({ user, onMessage }: EmailSettingsProps) {
 
         onMessage({
           type: "success",
-          text: "Email updated successfully! Please check your new email for verification.",
+          text: "Email updated successfully! Please verify your new email address."
         });
       } else {
         onMessage({
           type: "error",
-          text: result.error || "Failed to update email. Please try again.",
+          text: typeof result === 'object' && result !== null && 'message' in result 
+            ? (result as { message: string }).message 
+            : "Failed to update email. Please try again.",
         });
       }
     } catch (error) {
+      console.error("Error updating email:", error);
       onMessage({
         type: "error",
         text: "An unexpected error occurred. Please try again.",
@@ -72,6 +76,7 @@ export default function EmailSettings({ user, onMessage }: EmailSettingsProps) {
         text: "Verification email sent successfully!",
       });
     } catch (error) {
+      console.error("Error sending verification email:", error);
       onMessage({
         type: "error",
         text: "Failed to send verification email. Please try again.",

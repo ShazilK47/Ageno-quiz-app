@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 import {
   getStorage,
   ref,
@@ -124,10 +125,12 @@ export default function ImageUploader({
 
       {imageUrl ? (
         <div className="relative">
-          <img
+          <Image
             src={imageUrl}
             alt="Question"
             className="max-h-64 rounded-md border border-gray-200"
+            width={300}
+            height={200}
           />
           <button
             type="button"

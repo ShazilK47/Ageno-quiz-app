@@ -199,9 +199,8 @@ export default function QuizzesPage() {
         ) : sortedQuizzes.length === 0 ? (
           <div className="p-6 text-center">
             {searchTerm ? (
-              <>
-                <p className="text-gray-600">
-                  No quizzes found matching &quot;{searchTerm}"
+              <>                <p className="text-gray-600">
+                  No quizzes found matching &quot;{searchTerm}&quot;
                 </p>
                 <button
                   onClick={() => setSearchTerm("")}

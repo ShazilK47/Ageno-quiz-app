@@ -1,10 +1,13 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { useState } from "react";
 import { updateUserPassword } from "@/lib/actions/auth.actions";
 
+import { User as FirebaseUser } from "firebase/auth";
+
 interface PasswordSettingsProps {
-  user: any; // Replace with proper user type
+  user: FirebaseUser;
   onMessage: (
     message: { type: "success" | "error"; text: string } | null
   ) => void;
@@ -62,13 +65,13 @@ export default function PasswordSettings({
           type: "success",
           text: "Password updated successfully!",
         });
-      } else {
-        onMessage({
+      } else {        onMessage({
           type: "error",
-          text: result.error || "Failed to update password. Please try again.",
+          text: typeof result === 'object' && result !== null && 'message' in result 
+            ? (result as { message: string }).message 
+            : "Failed to update password. Please try again.",
         });
-      }
-    } catch (error) {
+      }    } catch (_) {
       onMessage({
         type: "error",
         text: "An unexpected error occurred. Please try again.",

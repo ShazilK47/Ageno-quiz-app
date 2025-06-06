@@ -10,7 +10,7 @@ import {
   collection,
   query,
   getDocs,
-  addDoc,
+  // addDoc, // Removing unused import
   deleteDoc,
   serverTimestamp,
   writeBatch,
@@ -19,8 +19,6 @@ import { db } from "@/firebase/client";
 import { FiPlus, FiTrash, FiSave, FiArrowLeft } from "react-icons/fi";
 import Link from "next/link";
 import { QuizDifficulty } from "@/types/quiz";
-import { error } from "console";
-import { title } from "process";
 
 interface QuizQuestion {
   id?: string;

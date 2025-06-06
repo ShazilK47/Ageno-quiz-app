@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Header from "@/components/Header";
 import { useAuth } from "@/contexts/auth-context";
 
-const SignIn = () => {
+// Separate component that uses searchParams to avoid direct usage in the main component
+function SignInContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -398,6 +399,15 @@ const SignIn = () => {
         </div>
       </main>
     </div>
+  );
+}
+
+// Main page component that wraps the content in a Suspense boundary
+const SignIn = () => {
+  return (
+    <Suspense fallback={<div className="flex justify-center p-8">Loading...</div>}>
+      <SignInContent />
+    </Suspense>
   );
 };
 

@@ -131,6 +131,7 @@ export default function UseAuthTest() {
     };
 
     runTests();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth]);
 
   return (

@@ -13,9 +13,13 @@ import {
   Timestamp,
   addDoc,
   orderBy,
+  FieldValue,
   // limit,
   //   collectionGroup,
 } from "firebase/firestore";
+
+// Firebase timestamp type alias for better readability
+export type FirebaseTimestamp = FieldValue;
 
 // Quiz type definition based on the provided schema
 export interface Quiz {
@@ -23,8 +27,8 @@ export interface Quiz {
   title: string;
   description: string;
   createdBy: string;
-  createdAt: Date;
-  updatedAt?: Date;
+  createdAt: Date | FirebaseTimestamp;
+  updatedAt?: Date | FirebaseTimestamp;
   duration: number; // in minutes (default duration for backward compatibility)
   isAutoCheck: boolean;
   accessCode: string;
@@ -74,11 +78,11 @@ export interface QuizSubmission {
   answers: Record<string, string[]>; // questionId -> selected option ids
   startedAt: Date;
   completedAt: Date;
-  createdAt: Date;
+  createdAt: Date | FirebaseTimestamp;
   score: number | null;
   maxScore?: number;
   percentage?: number;
-  gradedAt?: Date | null;
+  gradedAt?: Date | FirebaseTimestamp | null;
 }
 
 export interface QuizAttempt {

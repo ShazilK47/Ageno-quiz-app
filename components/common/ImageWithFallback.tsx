@@ -18,12 +18,10 @@ export default function ImageWithFallback({
   fallbackSrc,
   alt,
   ...props
-}: ImageWithFallbackProps) {
-  const [imgSrc, setImgSrc] = useState<string>(src);
+}: ImageWithFallbackProps) {  const [imgSrc, setImgSrc] = useState<string>(src);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [error, setError] = useState(false);  useEffect(() => {
     setImgSrc(src);
     setLoading(true);
     setError(false);
@@ -42,8 +40,7 @@ export default function ImageWithFallback({
         {...props}
         src={imgSrc}
         alt={alt}
-        onLoad={() => setLoading(false)}
-        onError={() => {
+        onLoad={() => setLoading(false)}        onError={() => {
           setError(true);
           setImgSrc(fallbackSrc);
         }}

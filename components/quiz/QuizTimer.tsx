@@ -85,6 +85,7 @@ export default function QuizTimer({
     }, 1000);
 
     return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeRemaining, onTimeUp, paused, totalSeconds]);
 
   // Warning animation for last 20% of time

@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { getUserQuizAttempts, QuizAttempt } from "@/firebase/firestore";
@@ -28,7 +28,7 @@ export default function MyQuizzes() {
     }
   }, [user, loading, router]);
 
-  const fetchAttempts = async () => {
+  const fetchAttempts = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -90,13 +90,13 @@ export default function MyQuizzes() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     if (user) {
       fetchAttempts();
     }
-  }, [user, retryCount]);
+  }, [user, retryCount, fetchAttempts]);
 
   if (loading || (!user && !error)) {
     return (

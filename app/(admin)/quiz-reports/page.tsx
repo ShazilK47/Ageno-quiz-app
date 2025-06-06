@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   collection,
   getDocs,
@@ -14,25 +14,11 @@ import { db } from "@/firebase/client";
 import QuizScoreDistribution from "@/components/analytics/QuizScoreDistribution";
 import QuizTimeDistribution from "@/components/analytics/QuizTimeDistribution";
 import { FiFilter, FiDownload } from "react-icons/fi";
-
-interface QuizResponse {
-  id: string;
-  quizId: string;
-  userId: string;
-  startedAt: any;
-  submittedAt: any;
-  score: number;
-  tabSwitchCount: number;
-  cameraFlags: string[];
-  userName?: string;
-  quizTitle?: string;
-}
+import { QuizResponse } from "@/types/quiz";
 
 export default function QuizReportsPage() {
   const [responses, setResponses] = useState<QuizResponse[]>([]);
-  const [filteredResponses, setFilteredResponses] = useState<QuizResponse[]>(
-    []
-  );
+  const [filteredResponses, setFilteredResponses] = useState<QuizResponse[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [quizOptions, setQuizOptions] = useState<
     { id: string; title: string }[]
@@ -40,90 +26,9 @@ export default function QuizReportsPage() {
   const [selectedQuiz, setSelectedQuiz] = useState<string>("all");
   const [dateRange, setDateRange] = useState<"all" | "week" | "month">("all");
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
-
-  useEffect(() => {
-    fetchReportsData();
-  }, []);
-
-  useEffect(() => {
-    filterResponses();
-  }, [responses, selectedQuiz, dateRange, sortOrder]);
-
-  const fetchReportsData = async () => {
-    try {
-      setIsLoading(true);
-
-      // Fetch all responses
-      const responsesRef = collection(db, "responses");
-      const q = query(responsesRef, orderBy("submittedAt", "desc"));
-      const querySnapshot = await getDocs(q);
-
-      const responsesList: QuizResponse[] = [];
-      const quizzesMap = new Map<string, { id: string; title: string }>();
-      const usersCache = new Map<string, string>(); // userId -> userName
-
-      // Process each response
-      for (const docSnapshot of querySnapshot.docs) {
-        const data = docSnapshot.data() as Omit<QuizResponse, "id">;
-
-        // Skip if no quizId or userId
-        if (!data.quizId || !data.userId) continue;
-
-        let quizTitle = "Unknown Quiz";
-        let userName = "Unknown User";
-
-        // Get quiz information (using cache if available)
-        if (!quizzesMap.has(data.quizId)) {
-          try {
-            const quizDoc = await getDoc(doc(db, "quizzes", data.quizId));
-            if (quizDoc.exists()) {
-              quizTitle = quizDoc.data().title || quizTitle;
-              quizzesMap.set(data.quizId, {
-                id: data.quizId,
-                title: quizTitle,
-              });
-            }
-          } catch (error) {
-            console.error("Error fetching quiz:", error);
-          }
-        } else {
-          quizTitle = quizzesMap.get(data.quizId)!.title;
-        }
-
-        // Get user information (using cache if available)
-        if (!usersCache.has(data.userId)) {
-          try {
-            const userDoc = await getDoc(doc(db, "users", data.userId));
-            if (userDoc.exists()) {
-              userName =
-                userDoc.data().displayName || userDoc.data().email || userName;
-              usersCache.set(data.userId, userName);
-            }
-          } catch (error) {
-            console.error("Error fetching user:", error);
-          }
-        } else {
-          userName = usersCache.get(data.userId)!;
-        }
-
-        responsesList.push({
-          id: docSnapshot.id,
-          ...data,
-          quizTitle,
-          userName,
-        });
-      }
-
-      setResponses(responsesList);
-      setQuizOptions(Array.from(quizzesMap.values()));
-    } catch (error) {
-      console.error("Error fetching reports data:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const filterResponses = () => {
+  
+  // Function to filter responses based on selected filters
+  const filterResponses = useCallback(() => {
     let filtered = [...responses];
 
     // Filter by quiz
@@ -145,55 +50,166 @@ export default function QuizReportsPage() {
       }
 
       filtered = filtered.filter((response) => {
-        const submittedDate = response.submittedAt?.toDate
+        const submittedDate = typeof response.submittedAt === 'object' && 'toDate' in response.submittedAt
           ? response.submittedAt.toDate()
-          : new Date(response.submittedAt);
+          : response.submittedAt ? new Date(response.submittedAt) : new Date();
         return submittedDate >= cutoffDate;
       });
     }
 
     // Apply sorting
     filtered.sort((a, b) => {
-      const dateA = a.submittedAt?.toDate
+      const dateA = typeof a.submittedAt === 'object' && 'toDate' in a.submittedAt
         ? a.submittedAt.toDate()
-        : new Date(a.submittedAt || 0);
-      const dateB = b.submittedAt?.toDate
+        : a.submittedAt ? new Date(a.submittedAt as number) : new Date(0);
+      const dateB = typeof b.submittedAt === 'object' && 'toDate' in b.submittedAt
         ? b.submittedAt.toDate()
-        : new Date(b.submittedAt || 0);
-      return sortOrder === "asc"
+        : b.submittedAt ? new Date(b.submittedAt as number) : new Date(0);
+        
+      return sortOrder === "asc" 
         ? dateA.getTime() - dateB.getTime()
         : dateB.getTime() - dateA.getTime();
     });
-
+    
     setFilteredResponses(filtered);
-  };
+  }, [responses, selectedQuiz, dateRange, sortOrder]);
+
+  // Apply filtering when dependencies change
+  useEffect(() => {
+    filterResponses();
+  }, [filterResponses]);
+  
+  // Fetch reports data on component mount
+  useEffect(() => {
+    fetchReportsData();
+  }, []);
 
   // Format date to readable string
-  const formatDate = (timestamp: any): string => {
+  const formatDate = (timestamp: Date | { toDate(): Date } | number | undefined): string => {
     if (!timestamp) return "Unknown";
 
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "numeric",
-    });
+    try {
+      const date = typeof timestamp === 'object' && 'toDate' in timestamp
+        ? timestamp.toDate() 
+        : new Date(timestamp as number | string);
+      
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "numeric",
+      });
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return "Invalid Date";
+    }
   };
 
   // Calculate time taken in minutes and seconds
-  const calculateTimeTaken = (startTime: any, endTime: any): string => {
+  const calculateTimeTaken = (
+    startTime: Date | { toDate(): Date } | number | undefined, 
+    endTime: Date | { toDate(): Date } | number | undefined
+  ): string => {
     if (!startTime || !endTime) return "Unknown";
+    
+    try {
+      const start = typeof startTime === 'object' && 'toDate' in startTime
+        ? startTime.toDate()
+        : new Date(startTime as number | string);
+      const end = typeof endTime === 'object' && 'toDate' in endTime
+        ? endTime.toDate()
+        : new Date(endTime as number | string);
+        
+      const diffSeconds = Math.floor((end.getTime() - start.getTime()) / 1000);
+      const minutes = Math.floor(diffSeconds / 60);
+      const seconds = diffSeconds % 60;
 
-    const start = startTime.toDate ? startTime.toDate() : new Date(startTime);
-    const end = endTime.toDate ? endTime.toDate() : new Date(endTime);
+      return `${minutes}m ${seconds}s`;
+    } catch (error) {
+      console.error("Error calculating time taken:", error);
+      return "Unknown";
+    }
+  };
 
-    const diffSeconds = Math.floor((end.getTime() - start.getTime()) / 1000);
-    const minutes = Math.floor(diffSeconds / 60);
-    const seconds = diffSeconds % 60;
+  const fetchReportsData = async () => {
+    try {
+      setIsLoading(true);
 
-    return `${minutes}m ${seconds}s`;
+      // Fetch all responses
+      const responsesRef = collection(db, "responses");
+      const q = query(responsesRef, orderBy("submittedAt", "desc"));
+      const querySnapshot = await getDocs(q);
+
+      const responsesList: QuizResponse[] = [];
+      const quizzesMap = new Map<string, { id: string; title: string }>();
+      const usersCache = new Map<string, string>(); // userId -> userName
+
+      // Process each response
+      for (const docSnapshot of querySnapshot.docs) {
+        const data = docSnapshot.data() as Omit<QuizResponse, "id">;
+        // Skip if no quizId or userId
+        if (!data.quizId || !data.userId) continue;
+
+        let quizTitle = "Unknown Quiz";
+        let userName = "Unknown User";
+
+        // Get quiz information (using cache if available)
+        const quizId = data.quizId as string;
+        const userId = data.userId as string;
+
+        // Get quiz information (using cache if available)
+        if (!quizzesMap.has(quizId)) {
+          try {
+            const quizDoc = await getDoc(doc(db, "quizzes", quizId));
+            if (quizDoc.exists()) {
+              quizTitle = quizDoc.data().title || quizTitle;
+              quizzesMap.set(quizId, {
+                id: quizId,
+                title: quizTitle,
+              });
+            }
+          } catch (error) {
+            console.error("Error fetching quiz:", error);
+          }
+        } else {
+          quizTitle = quizzesMap.get(quizId)!.title;
+        }
+
+        // Get user information (using cache if available)
+        if (!usersCache.has(userId)) {
+          try {
+            const userDoc = await getDoc(doc(db, "users", userId));
+            if (userDoc.exists()) {
+              userName =
+                userDoc.data().displayName || userDoc.data().email || userName;
+              usersCache.set(userId, userName);
+            }
+          } catch (error) {
+            console.error("Error fetching user:", error);
+          }
+        } else {
+          userName = usersCache.get(userId)!;
+        }
+
+        // Ensure the data has the required properties for QuizResponse
+        responsesList.push({
+          id: docSnapshot.id,
+          quizId: data.quizId,
+          userId: data.userId,
+          ...data,
+          quizTitle,
+          userName,
+        } as QuizResponse);
+      }
+
+      setResponses(responsesList);
+      setQuizOptions(Array.from(quizzesMap.values()));
+    } catch (error) {
+      console.error("Error fetching reports data:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Calculate stats
@@ -213,7 +229,7 @@ export default function QuizReportsPage() {
     let lowestScore = 100;
     let totalTimeSeconds = 0;
 
-    filteredResponses.forEach((response) => {
+    filteredResponses.forEach((response: QuizResponse) => {
       // Process scores
       if (response.score !== null && response.score !== undefined) {
         totalScore += response.score;
@@ -223,10 +239,10 @@ export default function QuizReportsPage() {
 
       // Process time taken
       if (response.startedAt && response.submittedAt) {
-        const start = response.startedAt.toDate
+        const start = typeof response.startedAt === 'object' && 'toDate' in response.startedAt
           ? response.startedAt.toDate()
           : new Date(response.startedAt);
-        const end = response.submittedAt.toDate
+        const end = typeof response.submittedAt === 'object' && 'toDate' in response.submittedAt
           ? response.submittedAt.toDate()
           : new Date(response.submittedAt);
         totalTimeSeconds += Math.floor(
@@ -267,7 +283,7 @@ export default function QuizReportsPage() {
       "Camera Flags",
     ];
 
-    const rows = filteredResponses.map((response) => [
+    const rows = filteredResponses.map((response: QuizResponse) => [
       response.quizTitle || "Unknown Quiz",
       response.userName || "Unknown User",
       response.score !== null && response.score !== undefined
@@ -281,7 +297,7 @@ export default function QuizReportsPage() {
 
     const csvContent = [
       headers.join(","),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+      ...rows.map((row: any[]) => row.map((cell: any) => `"${cell}"`).join(",")),
     ].join("\n");
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -526,7 +542,7 @@ export default function QuizReportsPage() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       {(response.cameraFlags || []).length > 0 ? (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          {response.cameraFlags.length} issues
+                          {response.cameraFlags?.length} issues
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">

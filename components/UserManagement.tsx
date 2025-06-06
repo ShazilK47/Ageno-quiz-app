@@ -9,8 +9,6 @@ import Message from "./user-management/Message";
 import { User } from "./user-management/types";
 import { useCollection } from "@/hooks/useCollection";
 import { handleFirebaseError } from "@/firebase/utils";
-import { div } from "framer-motion/client";
-import AdminProtected from "./AdminProtected";
 
 interface UserManagementProps {
   filterRole?: 'all' | 'admin' | 'student';
@@ -223,7 +221,7 @@ export default function UserManagement({ filterRole = 'all' }: UserManagementPro
       ) : sortedUsers.length === 0 ? (
         <div className="bg-gray-50 rounded-md p-8 text-center">
           {searchTerm ? (
-            <p className="text-gray-500">No users found matching "{searchTerm}"</p>
+            <p className="text-gray-500">No users found matching &quot;{searchTerm}&quot;</p>
           ) : (
             <p className="text-gray-500">No users found in this category</p>
           )}
@@ -266,9 +264,5 @@ export default function UserManagement({ filterRole = 'all' }: UserManagementPro
         </div>
       )}
     </div>
-  );
-}
-      </div>
-    </AdminProtected>
   );
 }

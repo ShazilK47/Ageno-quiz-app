@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   collection,
   getDocs,
@@ -42,13 +42,61 @@ export default function UsersPage() {
     verified: 0,
   });
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+  // Define filterAndSortUsers using useCallback
+  const filterAndSortUsers = useCallback(() => {
+    // First filter the users
+    const filtered = users.filter((user) => {
+      // Apply role filter
+      if (filter === "admin" && user.role !== "admin") return false;
+      if (filter === "user" && user.role !== "user") return false;
 
-  useEffect(() => {
-    // Filter and sort users whenever relevant states change
-    filterAndSortUsers();
+      // Apply search filter if search term exists
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        return (
+          user.email?.toLowerCase().includes(term) ||
+          false ||
+          user.displayName?.toLowerCase().includes(term) ||
+          false
+        );
+      }
+
+      return true;
+    });
+
+    // Then sort the filtered users
+    filtered.sort((a, b) => {
+      let aValue = a[sortBy as keyof User];
+      let bValue = b[sortBy as keyof User];
+
+      // Handle date sorting specifically
+      if (sortBy === "createdAt" || sortBy === "lastLoginAt") {
+        if (aValue && typeof aValue === "object" && "toDate" in aValue) {
+          aValue = aValue.toDate();
+        } else if (typeof aValue === "number") {
+          aValue = new Date(aValue);
+        }
+
+        if (bValue && typeof bValue === "object" && "toDate" in bValue) {
+          bValue = bValue.toDate();
+        } else if (typeof bValue === "number") {
+          bValue = new Date(bValue);
+        }
+
+        // Convert to timestamps for comparison
+        aValue = aValue instanceof Date ? aValue.getTime() : 0;
+        bValue = bValue instanceof Date ? bValue.getTime() : 0;
+      }
+
+      // Apply sort order
+      if (sortOrder === "asc") {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+
+    setFilteredUsers(filtered);
   }, [users, searchTerm, filter, sortBy, sortOrder]);
 
   const fetchUsers = async () => {
@@ -89,64 +137,15 @@ export default function UsersPage() {
     }
   };
 
-  const filterAndSortUsers = () => {
-    // First filter the users
-    let filtered = users.filter((user) => {
-      // Apply role filter
-      if (filter === "admin" && user.role !== "admin") return false;
-      if (filter === "user" && user.role !== "user") return false;
-
-      // Apply search filter if search term exists
-      if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        return (
-          user.email?.toLowerCase().includes(term) ||
-          false ||
-          user.displayName?.toLowerCase().includes(term) ||
-          false
-        );
-      }
-
-      return true;
-    });
-
-    // Then sort the filtered users
-    filtered = [...filtered].sort((a, b) => {
-      if (sortBy === "name") {
-        const nameA = a.displayName || a.email || "";
-        const nameB = b.displayName || b.email || "";
-        const comparison = nameA.localeCompare(nameB);
-        return sortOrder === "asc" ? comparison : -comparison;
-      } else if (sortBy === "email") {
-        const comparison = (a.email || "").localeCompare(b.email || "");
-        return sortOrder === "asc" ? comparison : -comparison;
-      } else if (sortBy === "role") {
-        const comparison = (a.role || "").localeCompare(b.role || "");
-        return sortOrder === "asc" ? comparison : -comparison;
-      } else if (sortBy === "lastLogin") {
-        const dateA = a.lastLoginAt?.toDate
-          ? a.lastLoginAt.toDate()
-          : new Date(a.lastLoginAt || 0);
-        const dateB = b.lastLoginAt?.toDate
-          ? b.lastLoginAt.toDate()
-          : new Date(b.lastLoginAt || 0);
-        const comparison = dateA.getTime() - dateB.getTime();
-        return sortOrder === "asc" ? comparison : -comparison;
-      } else {
-        // Default to created date
-        const dateA = a.createdAt?.toDate
-          ? a.createdAt.toDate()
-          : new Date(a.createdAt || 0);
-        const dateB = b.createdAt?.toDate
-          ? b.createdAt.toDate()
-          : new Date(b.createdAt || 0);
-        const comparison = dateA.getTime() - dateB.getTime();
-        return sortOrder === "asc" ? comparison : -comparison;
-      }
-    });
-
-    setFilteredUsers(filtered);
-  };
+  // Fetch users on component mount
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+  
+  // Filter and sort users when dependencies change
+  useEffect(() => {
+    filterAndSortUsers();
+  }, [filterAndSortUsers]);
 
   const handleUpdateRole = async (userId: string, newRole: string) => {
     try {

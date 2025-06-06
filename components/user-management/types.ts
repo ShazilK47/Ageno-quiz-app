@@ -5,5 +5,5 @@ export interface User {
   email: string;
   displayName: string;
   role: string;
-  createdAt: any; // Firestore timestamp or Date
+  createdAt: Date | { toDate(): Date } | number; // Firestore timestamp or Date
 }

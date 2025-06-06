@@ -1,12 +1,24 @@
 // components/QuizCard.tsx
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Quiz } from "@/firebase/firestore";
+import { FirebaseTimestamp, Quiz } from "@/firebase/firestore";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 
 interface QuizCardProps {
   quiz: Quiz;
+}
+
+// Utility function to handle Firebase Timestamp or Date objects
+function getDateValue(dateField: Date | FirebaseTimestamp): Date {
+  // If it's already a Date object, return it
+  if (dateField instanceof Date) {
+    return dateField;
+  }
+
+  // If it's a Firebase server timestamp (not yet resolved), return current date
+  // This is a fallback since server timestamps are not actual dates until written to the database
+  return new Date();
 }
 
 export default function QuizCard({ quiz }: QuizCardProps) {
@@ -213,7 +225,7 @@ export default function QuizCard({ quiz }: QuizCardProps) {
 
         <div className="p-6 pt-4 bg-gradient-to-b from-white to-gray-50 flex justify-between items-center mt-auto border-t border-gray-100">
           <span className="text-xs text-gray-500 italic">
-            {formatDistanceToNow(quiz.createdAt, { addSuffix: true })}
+            {formatDistanceToNow(getDateValue(quiz.createdAt), { addSuffix: true })}
           </span>
 
           <motion.div whileTap={{ scale: 0.97 }}>

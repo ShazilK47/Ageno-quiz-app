@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
 import { sendVerificationEmail } from "@/lib/actions/auth.actions";
 import Header from "@/components/Header";
 
-const VerifyEmailPage = () => {
+// Component that uses searchParams (should be wrapped in Suspense)
+function VerifyEmailContent() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -286,6 +287,15 @@ const VerifyEmailPage = () => {
         </div>
       </main>
     </div>
+  );
+}
+
+// Main component that wraps the content in a Suspense boundary
+const VerifyEmailPage = () => {
+  return (
+    <Suspense fallback={<div className="flex justify-center p-8">Loading verification details...</div>}>
+      <VerifyEmailContent />
+    </Suspense>
   );
 };
 

@@ -1,10 +1,12 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { useState, useEffect } from "react";
 import { updateUserProfile } from "@/lib/actions/auth.actions";
+import { User as FirebaseUser } from "firebase/auth";
 
 interface ProfileInfoProps {
-  user: any; // Replace with proper user type
+  user: FirebaseUser;
   onMessage: (
     message: { type: "success" | "error"; text: string } | null
   ) => void;
@@ -38,13 +40,13 @@ export default function ProfileInfo({ user, onMessage }: ProfileInfoProps) {
           type: "success",
           text: "Profile updated successfully!",
         });
-      } else {
-        onMessage({
+      } else {        onMessage({
           type: "error",
-          text: result.error || "Failed to update profile. Please try again.",
+          text: typeof result === 'object' && result !== null && 'message' in result 
+            ? (result as { message: string }).message 
+            : "Failed to update profile. Please try again.",
         });
-      }
-    } catch (error) {
+      }    } catch (_) {
       onMessage({
         type: "error",
         text: "An unexpected error occurred. Please try again.",

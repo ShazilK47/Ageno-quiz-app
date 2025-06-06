@@ -371,11 +371,11 @@ export default function Home() {
           <div className="max-w-5xl mx-auto">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12">
               <div className="text-center">
-                <div className="text-4xl lg:text-5xl font-bold text-purple-600 mb-2 bg-white rounded-lg py-3 px-2 shadow-md">2,500+</div>
+                <div className="text-4xl lg:text-5xl font-bold text-purple-600 mb-2 bg-white rounded-lg py-3 px-2 shadow-md">500+</div>
                 <p className="text-gray-700 mt-3 font-medium">Students Daily</p>
               </div>
               <div className="text-center">
-                <div className="text-4xl lg:text-5xl font-bold text-purple-600 mb-2 bg-white rounded-lg py-3 px-2 shadow-md">15,000+</div>
+                <div className="text-4xl lg:text-5xl font-bold text-purple-600 mb-2 bg-white rounded-lg py-3 px-2 shadow-md">100+</div>
                 <p className="text-gray-700 mt-3 font-medium">Assessments</p>
               </div>
               <div className="text-center">
@@ -383,7 +383,7 @@ export default function Home() {
                 <p className="text-gray-700 mt-3 font-medium">Completion Rate</p>
               </div>
               <div className="text-center">
-                <div className="text-4xl lg:text-5xl font-bold text-purple-600 mb-2 bg-white rounded-lg py-3 px-2 shadow-md">100+</div>
+                <div className="text-4xl lg:text-5xl font-bold text-purple-600 mb-2 bg-white rounded-lg py-3 px-2 shadow-md">10+</div>
                 <p className="text-gray-700 mt-3 font-medium">Institutions</p>
               </div>
             </div>
@@ -411,7 +411,7 @@ export default function Home() {
                   platform makes assessment simple and straightforward.
                 </p>
                 <Link
-                  href="/quiz/join"
+                  href="/join"
                   className="group inline-flex items-center justify-center py-4 px-8 rounded-full font-medium bg-gradient-to-r from-purple-600 to-blue-500 text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
                 >
                   <span className="flex items-center">

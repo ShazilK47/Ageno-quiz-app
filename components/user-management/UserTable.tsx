@@ -49,12 +49,16 @@ export default function UserTable({
       case "date":
         const dateA = a.createdAt
           ? new Date(
-              a.createdAt.toDate ? a.createdAt.toDate() : a.createdAt
+              typeof a.createdAt === 'object' && 'toDate' in a.createdAt 
+                ? a.createdAt.toDate() 
+                : a.createdAt
             ).getTime()
           : 0;
         const dateB = b.createdAt
           ? new Date(
-              b.createdAt.toDate ? b.createdAt.toDate() : b.createdAt
+              typeof b.createdAt === 'object' && 'toDate' in b.createdAt 
+                ? b.createdAt.toDate() 
+                : b.createdAt
             ).getTime()
           : 0;
         comparison = dateA - dateB;
