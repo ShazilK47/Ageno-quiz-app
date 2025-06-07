@@ -52,6 +52,13 @@ export interface Quiz {
       pointsMultiplier: number;
     };
   };
+  // Counts of questions by difficulty level
+  questionCountByDifficulty?: {
+    easy?: number;
+    medium?: number;
+    hard?: number;
+    [key: string]: number | undefined;
+  };
 }
 
 export interface QuizQuestion {

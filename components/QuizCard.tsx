@@ -31,6 +31,16 @@ export default function QuizCard({ quiz }: QuizCardProps) {
 
   // Get detailed info about time variations across difficulty levels
   const getTimeInfo = () => {
+    // Handle case with no duration property
+    if (quiz.duration === undefined || quiz.duration === null) {
+      return {
+        hasDifferentDurations: false,
+        displayText: "N/A",
+        tooltip: "Time limit not specified",
+        formattedDuration: "Not specified"
+      };
+    }
+
     if (!quiz.difficultySettings || !quiz.availableDifficulties || quiz.availableDifficulties.length <= 1) {
       return {
         hasDifferentDurations: false,
@@ -131,8 +141,8 @@ export default function QuizCard({ quiz }: QuizCardProps) {
     if (!quiz.availableDifficulties || quiz.availableDifficulties.length === 0) {
       // Show a default badge if no difficulties are specified
       return (
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-xs bg-yellow-100 text-yellow-800">
-          Medium
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-xs bg-gray-100 text-gray-700">
+          <span className="text-gray-500 text-xs italic">Not specified</span>
         </span>
       );
     }
@@ -152,13 +162,26 @@ export default function QuizCard({ quiz }: QuizCardProps) {
               : "bg-yellow-100 text-yellow-800";
             
             // Get the duration for this difficulty
-            const duration = quiz.difficultySettings?.[diff as keyof typeof quiz.difficultySettings]?.duration || quiz.duration;
+            const duration = quiz.duration !== undefined 
+              ? (quiz.difficultySettings?.[diff as keyof typeof quiz.difficultySettings]?.duration || quiz.duration) 
+              : "N/A";
+            
+            // Get question count for this difficulty
+            const questionCount = quiz.questionCountByDifficulty?.[diff] !== undefined
+              ? quiz.questionCountByDifficulty[diff]
+              : (quiz.questions && Array.isArray(quiz.questions) ? quiz.questions.length : "N/A");
+              
+            // Build tooltip with all available info
+            const tooltipParts = [];
+            if (duration !== "N/A") tooltipParts.push(`Duration: ${duration} min`);
+            if (questionCount !== "N/A") tooltipParts.push(`Questions: ${questionCount}`);
+            const tooltip = tooltipParts.length > 0 ? tooltipParts.join(' • ') : `${diff.charAt(0).toUpperCase() + diff.slice(1)} difficulty`;
             
             return (
               <span
                 key={diff}
                 className={`inline-flex items-center justify-center w-full px-1.5 py-0.5 rounded-md text-xs ${colorClass} transition-all`}
-                title={`${diff.charAt(0).toUpperCase() + diff.slice(1)}: ${duration} min`}
+                title={tooltip}
               >
                 {diff.charAt(0).toUpperCase() + diff.slice(1)}
               </span>
@@ -170,20 +193,72 @@ export default function QuizCard({ quiz }: QuizCardProps) {
   
   // Get information about question count, potentially varying by difficulty
   const getQuestionInfo = () => {
-    const baseQuestionCount = quiz.questions && Array.isArray(quiz.questions) 
-      ? quiz.questions.length 
-      : 1;
+    // Use actual question count if available, or give a better estimation
+    const hasQuestionsArray = quiz.questions && Array.isArray(quiz.questions);
+    const hasQuestionCountByDifficulty = quiz.questionCountByDifficulty && Object.keys(quiz.questionCountByDifficulty).length > 0;
     
-    // In the future, if we implement per-difficulty question sets, we can enhance this function
-    // to show variable question counts like we do with duration
+    // Determine if we actually have any valid question count data
+    const hasAnyQuestionData = hasQuestionsArray || hasQuestionCountByDifficulty;
     
-    const tooltip = hasMultipleDifficulties(quiz) 
-      ? `${baseQuestionCount} questions${timeInfo.hasDifferentDurations ? ' with time limits varying by difficulty level' : ''}`
-      : `${baseQuestionCount} questions in this quiz (${timeInfo.formattedDuration})`;
+    // If we have no question data at all, show "N/A" instead of a misleading number
+    if (!hasAnyQuestionData) {
+      return {
+        hasVariableCount: false,
+        displayText: "N/A",
+        tooltip: "Question count not available"
+      };
+    }
+    
+    const baseQuestionCount = hasQuestionsArray 
+      ? quiz.questions!.length 
+      : (quiz.questionCountByDifficulty?.medium || quiz.questionCountByDifficulty?.easy || 
+         (hasQuestionCountByDifficulty ? Object.values(quiz.questionCountByDifficulty!).find(count => count !== undefined) : 1));
+    
+    // Check if we have different question counts for different difficulties
+    const hasVariableCount = hasMultipleDifficulties(quiz) && hasQuestionCountByDifficulty;
+    
+    let displayText = `${baseQuestionCount}`;
+    let tooltip = '';
+    
+    if (hasVariableCount && quiz.questionCountByDifficulty) {
+      // If we have question counts by difficulty, show a range
+      const counts = Object.values(quiz.questionCountByDifficulty);
+      // Filter out undefined values and ensure we're working with numbers only
+      const validCounts = counts.filter((count): count is number => count !== undefined);
+      
+      if (validCounts.length > 0) {
+        const minCount = Math.min(...validCounts);
+        const maxCount = Math.max(...validCounts);
+        
+        // If there's variation in counts, show as a range
+        if (minCount !== maxCount) {
+          displayText = `${minCount}-${maxCount}`;
+          
+          // Build a detailed tooltip with counts per difficulty
+          const tooltipParts = Object.entries(quiz.questionCountByDifficulty)
+            .sort(([a], [b]) => {
+              const order = { easy: 1, medium: 2, hard: 3 };
+              return (order[a as keyof typeof order] || 99) - (order[b as keyof typeof order] || 99);
+            })
+            .map(([diff, count]) => `${diff.charAt(0).toUpperCase() + diff.slice(1)}: ${count}`);
+            
+          tooltip = `Questions vary by difficulty: ${tooltipParts.join(' • ')}`;
+        } else {
+          // If all difficulties have the same count
+          displayText = `${minCount}`;
+          tooltip = `${minCount} questions for all difficulty levels`;
+        }
+      }
+    } else {
+      // Use base question count
+      tooltip = hasMultipleDifficulties(quiz) 
+        ? `${baseQuestionCount} questions${timeInfo.hasDifferentDurations ? ' with time limits varying by difficulty level' : ''}`
+        : `${baseQuestionCount} questions in this quiz (${timeInfo.formattedDuration})`;
+    }
       
     return {
-      hasVariableCount: false, // Will be true when per-difficulty question sets are implemented
-      displayText: `${baseQuestionCount}`,
+      hasVariableCount: hasVariableCount && quiz.questionCountByDifficulty ? true : false,
+      displayText,
       tooltip
     };
   };
@@ -228,11 +303,17 @@ export default function QuizCard({ quiz }: QuizCardProps) {
             >
               <span className="text-xs text-gray-500 mb-1">Time Limit</span>
               <span className="font-semibold text-gray-800 flex items-center gap-1">
-                {timeInfo.displayText}
-                {timeInfo.hasDifferentDurations && (
-                  <span className="text-xs bg-gray-100 text-gray-600 px-1 rounded-sm whitespace-nowrap">
-                    by level
-                  </span>
+                {timeInfo.displayText === "N/A" ? (
+                  <span className="text-gray-500 text-xs italic">Not specified</span>
+                ) : (
+                  <>
+                    {timeInfo.displayText}
+                    {timeInfo.hasDifferentDurations && (
+                      <span className="text-xs bg-gray-100 text-gray-600 px-1 rounded-sm whitespace-nowrap">
+                        by level
+                      </span>
+                    )}
+                  </>
                 )}
               </span>
             </div>
@@ -240,7 +321,7 @@ export default function QuizCard({ quiz }: QuizCardProps) {
             {/* Difficulty */}
             <div className="bg-gradient-to-br from-gray-50 to-white rounded-lg p-3 flex flex-col items-center shadow-sm border border-gray-100">
               <span className="text-xs text-gray-500 mb-1">Difficulty</span>
-              <div className="w-full">
+              <div className="flex justify-center gap-1 flex-wrap">
                 {renderDifficultyBadges()}
               </div>
             </div>
@@ -252,11 +333,17 @@ export default function QuizCard({ quiz }: QuizCardProps) {
             >
               <span className="text-xs text-gray-500 mb-1">Questions</span>
               <span className="font-semibold text-gray-800 flex items-center gap-1">
-                {questionInfo.displayText}
-                {hasMultipleDiffs && questionInfo.hasVariableCount && (
-                  <span className="text-xs bg-gray-100 text-gray-600 px-1 rounded-sm whitespace-nowrap">
-                    by level
-                  </span>
+                {questionInfo.displayText === "N/A" ? (
+                  <span className="text-gray-500 text-xs italic">Not specified</span>
+                ) : (
+                  <>
+                    {questionInfo.displayText}
+                    {questionInfo.hasVariableCount && (
+                      <span className="text-xs bg-gray-100 text-gray-600 px-1 rounded-sm whitespace-nowrap">
+                        by level
+                      </span>
+                    )}
+                  </>
                 )}
               </span>
             </div>
@@ -267,19 +354,19 @@ export default function QuizCard({ quiz }: QuizCardProps) {
           <div className="flex justify-between items-center w-full">
             <span className="text-xs text-gray-500">
               {formatDistanceToNow(getDateValue(quiz.createdAt), { addSuffix: true })}
-            </span>
-
-            <div className="flex flex-col gap-1">
+            </span>              <div className="flex flex-col gap-1">
               {hasMultipleDiffs && (
                 <div 
                   className="text-xs text-gray-500 italic mb-1 flex items-center gap-1 cursor-help"
-                  title={`This quiz offers ${quiz.availableDifficulties?.length} difficulty levels. ${timeInfo.hasDifferentDurations ? 'Time limit varies by selected difficulty.' : ''}`}
+                  title={`This quiz offers ${quiz.availableDifficulties?.length} difficulty levels. ${timeInfo.hasDifferentDurations || questionInfo.hasVariableCount ? 'Time limits and/or question counts vary by selected difficulty.' : ''}`}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M12 16V12M12 8H12.01M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" 
                       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                  Select difficulty after joining
+                  {timeInfo.hasDifferentDurations || questionInfo.hasVariableCount 
+                    ? "Difficulty affects time & questions"
+                    : "Select difficulty after joining"}
                 </div>
               )}
               <motion.div whileTap={{ scale: 0.97 }}>
