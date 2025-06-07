@@ -512,7 +512,7 @@ const ProfilePage = () => {
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary shadow-sm"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
               placeholder="Your display name"
             />
           </div>
@@ -570,7 +570,7 @@ const ProfilePage = () => {
                   type="button"
                   onClick={handleSendVerification}
                   disabled={isSubmitting}
-                  className="text-sm text-accent-primary hover:text-accent-primary/80"
+                  className="text-sm text-blue-600 hover:text-blue-800 underline"
                 >
                   Resend verification email
                 </button>
@@ -581,7 +581,7 @@ const ProfilePage = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="bg-gradient-to-r from-purple-primary to-tech-blue-light text-white font-medium py-2 px-6 rounded-lg hover:shadow-md hover:shadow-purple-primary/20 transition-all duration-300 flex items-center justify-center disabled:opacity-50"
+            className="bg-blue-600 text-white font-medium py-2 px-6 rounded-lg hover:bg-blue-700 transition-all duration-300 flex items-center justify-center disabled:opacity-50"
           >
             {isSubmitting ? (
               <span className="flex items-center">
@@ -672,7 +672,7 @@ const ProfilePage = () => {
               type="email"
               value={newEmail}
               onChange={(e) => setNewEmail(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary shadow-sm"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
               placeholder="your-new-email@example.com"
               required
             />
@@ -690,7 +690,7 @@ const ProfilePage = () => {
               type="password"
               value={emailPassword}
               onChange={(e) => setEmailPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary shadow-sm"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
               placeholder="Enter your current password"
               required
             />
@@ -699,7 +699,7 @@ const ProfilePage = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="bg-gradient-to-r from-purple-primary to-tech-blue-light text-white font-medium py-2 px-6 rounded-lg hover:shadow-md hover:shadow-purple-primary/20 transition-all duration-300 flex items-center justify-center disabled:opacity-50"
+            className="bg-blue-600 text-white font-medium py-2 px-6 rounded-lg hover:bg-blue-700 transition-all duration-300 flex items-center justify-center disabled:opacity-50"
           >
             {isSubmitting ? (
               <span className="flex items-center">
@@ -753,7 +753,7 @@ const ProfilePage = () => {
               type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary shadow-sm"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
               placeholder="Enter your current password"
               required
             />
@@ -771,7 +771,7 @@ const ProfilePage = () => {
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary shadow-sm"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
               placeholder="Enter your new password"
               required
               minLength={8}
@@ -793,7 +793,7 @@ const ProfilePage = () => {
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary shadow-sm"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
               placeholder="Confirm your new password"
               required
             />
@@ -802,7 +802,7 @@ const ProfilePage = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="bg-gradient-to-r from-purple-primary to-tech-blue-light text-white font-medium py-2 px-6 rounded-lg hover:shadow-md hover:shadow-purple-primary/20 transition-all duration-300 flex items-center justify-center disabled:opacity-50"
+            className="bg-blue-600 text-white font-medium py-2 px-6 rounded-lg hover:bg-blue-700 transition-all duration-300 flex items-center justify-center disabled:opacity-50"
           >
             {isSubmitting ? (
               <span className="flex items-center">
@@ -878,7 +878,7 @@ const ProfilePage = () => {
                     type="button"
                     onClick={handleSendVerification}
                     disabled={isSubmitting}
-                    className="bg-accent-primary text-white text-sm py-1.5 px-4 rounded hover:bg-accent-primary/90 transition disabled:opacity-50"
+                    className="bg-blue-600 text-white text-sm py-1.5 px-4 rounded hover:bg-blue-700 transition disabled:opacity-50"
                   >
                     {isSubmitting ? "Sending..." : "Verify Email"}
                   </button>
@@ -1048,7 +1048,7 @@ const ProfilePage = () => {
                           type="tel"
                           value={phoneNumber}
                           onChange={(e) => setPhoneNumber(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary shadow-sm"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
                           placeholder="+1 555 123 4567"
                           required
                         />
@@ -1065,7 +1065,7 @@ const ProfilePage = () => {
                           type="button"
                           onClick={handleStartPhoneMfa}
                           disabled={isSubmitting || !phoneNumber}
-                          className="bg-accent-primary text-white text-sm py-2 px-4 rounded hover:bg-accent-primary/90 transition disabled:opacity-50"
+                          className="bg-blue-600 text-white text-sm py-2 px-4 rounded hover:bg-blue-700 transition disabled:opacity-50"
                         >
                           {isSubmitting
                             ? "Sending..."
@@ -1095,7 +1095,7 @@ const ProfilePage = () => {
                           type="text"
                           value={verificationCode}
                           onChange={(e) => setVerificationCode(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary shadow-sm"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
                           placeholder="123456"
                           required
                         />
@@ -1109,7 +1109,7 @@ const ProfilePage = () => {
                           type="button"
                           onClick={handleCompletePhoneMfa}
                           disabled={isSubmitting || !verificationCode}
-                          className="bg-accent-primary text-white text-sm py-2 px-4 rounded hover:bg-accent-primary/90 transition disabled:opacity-50"
+                          className="bg-blue-600 text-white text-sm py-2 px-4 rounded hover:bg-blue-700 transition disabled:opacity-50"
                         >
                           {isSubmitting ? "Verifying..." : "Verify Code"}
                         </button>
@@ -1148,7 +1148,7 @@ const ProfilePage = () => {
                             type="button"
                             onClick={handleStartTotpMfa}
                             disabled={isSubmitting}
-                            className="bg-accent-primary text-white text-sm py-2 px-4 rounded hover:bg-accent-primary/90 transition disabled:opacity-50"
+                            className="bg-blue-600 text-white text-sm py-2 px-4 rounded hover:bg-blue-700 transition disabled:opacity-50"
                           >
                             {isSubmitting
                               ? "Generating..."
@@ -1200,7 +1200,7 @@ const ProfilePage = () => {
                             onChange={(e) =>
                               setVerificationCode(e.target.value)
                             }
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary shadow-sm"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
                             placeholder="123456"
                             required
                           />
@@ -1215,7 +1215,7 @@ const ProfilePage = () => {
                             type="button"
                             onClick={handleCompleteTotpMfa}
                             disabled={isSubmitting || !verificationCode}
-                            className="bg-accent-primary text-white text-sm py-2 px-4 rounded hover:bg-accent-primary/90 transition disabled:opacity-50"
+                            className="bg-blue-600 text-white text-sm py-2 px-4 rounded hover:bg-blue-700 transition disabled:opacity-50"
                           >
                             {isSubmitting ? "Verifying..." : "Verify Code"}
                           </button>
@@ -1336,7 +1336,7 @@ const ProfilePage = () => {
             {/* Sidebar */}
             <div className="md:w-64 bg-gray-50 p-6 border-r border-gray-200">
               <div className="flex items-center mb-8">
-                <div className="h-12 w-12 rounded-full bg-gradient-to-r from-purple-primary to-tech-blue-light flex items-center justify-center text-white font-bold text-xl mr-4">
+                <div className="h-12 w-12 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-xl mr-4">
                   {user?.displayName?.[0]?.toUpperCase() ||
                     user?.email?.[0]?.toUpperCase() ||
                     "U"}
