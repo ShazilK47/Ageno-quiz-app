@@ -96,7 +96,8 @@ function SignInContent() {
         // Handle specific error codes
         if (
           result.error?.includes("auth/user-not-found") ||
-          result.error?.includes("auth/wrong-password")
+          result.error?.includes("auth/wrong-password") ||
+          result.error?.includes("auth/invalid-credential")
         ) {
           setError("Invalid email or password. Please try again.");
         } else if (result.error?.includes("auth/user-disabled")) {
@@ -105,9 +106,14 @@ function SignInContent() {
           setError(
             "Too many failed login attempts. Please try again later or reset your password."
           );
-        } else {
+        } else if (result.error?.includes("auth/network-request-failed")) {
           setError(
-            result.error || "Failed to sign in. Please check your credentials."
+            "Network connection error. Please check your internet connection and try again."
+          );
+        } else {
+          // For any other Firebase errors, provide a user-friendly message instead of raw error
+          setError(
+            "Sign in failed. Please check your credentials and try again."
           );
         }
       }

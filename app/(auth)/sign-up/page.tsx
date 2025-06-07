@@ -144,8 +144,13 @@ const SignUp = () => {
           setError(
             "Your password is too weak. Please choose a stronger password."
           );
+        } else if (result.error?.includes("auth/network-request-failed")) {
+          setError(
+            "Network connection error. Please check your internet connection and try again."
+          );
         } else {
-          setError(result.error || "Failed to sign up. Please try again.");
+          // For any other Firebase errors, provide a user-friendly message instead of raw error
+          setError("Failed to create account. Please try again later.");
         }
       }
     } catch (err) {

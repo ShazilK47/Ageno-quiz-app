@@ -4,6 +4,7 @@ import { formatDistanceToNow } from "date-fns";
 import { FirebaseTimestamp, Quiz } from "@/firebase/firestore";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { hasMultipleDifficulties } from "@/utils/difficulty-helpers";
 
 interface QuizCardProps {
   quiz: Quiz;
@@ -27,6 +28,69 @@ export default function QuizCard({ quiz }: QuizCardProps) {
   const [error, setError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const router = useRouter();
+
+  // Get detailed info about time variations across difficulty levels
+  const getTimeInfo = () => {
+    if (!quiz.difficultySettings || !quiz.availableDifficulties || quiz.availableDifficulties.length <= 1) {
+      return {
+        hasDifferentDurations: false,
+        displayText: `${quiz.duration} min`,
+        tooltip: `${quiz.duration} minutes for this quiz`,
+        formattedDuration: `${quiz.duration} minutes`
+      };
+    }
+    
+    // Track durations for each difficulty and determine if they differ
+    const durationByDifficulty: Record<string, number> = {};
+    let allSame = true;
+    let firstDuration: number | null = null;
+    
+    // Collect durations for each difficulty
+    quiz.availableDifficulties.forEach(diff => {
+      const duration = quiz.difficultySettings?.[diff as keyof typeof quiz.difficultySettings]?.duration || quiz.duration;
+      durationByDifficulty[diff] = duration;
+      
+      if (firstDuration === null) {
+        firstDuration = duration;
+      } else if (duration !== firstDuration) {
+        allSame = false;
+      }
+    });
+    
+    // If all durations are the same, just return that single value
+    if (allSame) {
+      const duration = firstDuration || quiz.duration;
+      return {
+        hasDifferentDurations: false,
+        displayText: `${duration} min`,
+        tooltip: `${duration} minutes for all difficulty levels`,
+        formattedDuration: `${duration} minutes`
+      };
+    }
+    
+    // Calculate the range for display text
+    const min = Math.min(...Object.values(durationByDifficulty));
+    const max = Math.max(...Object.values(durationByDifficulty));
+    
+    // Build a detailed tooltip with sorted difficulty levels
+    const tooltipParts = quiz.availableDifficulties
+      .sort((a, b) => {
+        const order = { easy: 1, medium: 2, hard: 3 };
+        return (order[a as keyof typeof order] || 99) - (order[b as keyof typeof order] || 99);
+      })
+      .map(diff => {
+        const duration = durationByDifficulty[diff];
+        return `${diff.charAt(0).toUpperCase() + diff.slice(1)}: ${duration} min`;
+      });
+    
+    return {
+      hasDifferentDurations: true,
+      displayText: `${min}-${max} min`,
+      tooltip: tooltipParts.join(' • '),
+      formattedDuration: `${min}-${max} minutes (varies by difficulty)`,
+      durations: durationByDifficulty
+    };
+  };
 
   const handleJoinClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -62,6 +126,72 @@ export default function QuizCard({ quiz }: QuizCardProps) {
     }
   };
 
+  // Helper function to render difficulty badges with tooltips for time info
+  const renderDifficultyBadges = () => {
+    if (!quiz.availableDifficulties || quiz.availableDifficulties.length === 0) {
+      // Show a default badge if no difficulties are specified
+      return (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-xs bg-yellow-100 text-yellow-800">
+          Medium
+        </span>
+      );
+    }
+
+    return (
+      <div className="flex flex-col gap-1">
+        {quiz.availableDifficulties
+          .sort((a, b) => {
+            const order = { easy: 1, medium: 2, hard: 3 };
+            return (order[a as keyof typeof order] || 99) - (order[b as keyof typeof order] || 99);
+          })
+          .map((diff) => {
+            const colorClass = diff === "easy"
+              ? "bg-green-100 text-green-800"
+              : diff === "hard"
+              ? "bg-red-100 text-red-800"
+              : "bg-yellow-100 text-yellow-800";
+            
+            // Get the duration for this difficulty
+            const duration = quiz.difficultySettings?.[diff as keyof typeof quiz.difficultySettings]?.duration || quiz.duration;
+            
+            return (
+              <span
+                key={diff}
+                className={`inline-flex items-center justify-center w-full px-1.5 py-0.5 rounded-md text-xs ${colorClass} transition-all`}
+                title={`${diff.charAt(0).toUpperCase() + diff.slice(1)}: ${duration} min`}
+              >
+                {diff.charAt(0).toUpperCase() + diff.slice(1)}
+              </span>
+            );
+          })}
+      </div>
+    );
+  };
+  
+  // Get information about question count, potentially varying by difficulty
+  const getQuestionInfo = () => {
+    const baseQuestionCount = quiz.questions && Array.isArray(quiz.questions) 
+      ? quiz.questions.length 
+      : 1;
+    
+    // In the future, if we implement per-difficulty question sets, we can enhance this function
+    // to show variable question counts like we do with duration
+    
+    const tooltip = hasMultipleDifficulties(quiz) 
+      ? `${baseQuestionCount} questions${timeInfo.hasDifferentDurations ? ' with time limits varying by difficulty level' : ''}`
+      : `${baseQuestionCount} questions in this quiz (${timeInfo.formattedDuration})`;
+      
+    return {
+      hasVariableCount: false, // Will be true when per-difficulty question sets are implemented
+      displayText: `${baseQuestionCount}`,
+      tooltip
+    };
+  };
+
+  const hasMultipleDiffs = hasMultipleDifficulties(quiz);
+  const timeInfo = getTimeInfo();
+  const questionInfo = getQuestionInfo();
+
   return (
     <motion.div
       className="h-full rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 bg-white border border-gray-100 group relative"
@@ -75,7 +205,6 @@ export default function QuizCard({ quiz }: QuizCardProps) {
 
       <div className="flex flex-col h-full relative z-10">
         <div className="p-6 pb-4 border-b border-gray-100 flex justify-between items-start">
-          {" "}
           <h3 className="text-xl font-bold text-gray-800 line-clamp-1 group-hover:text-indigo-700 transition-colors duration-300 tracking-tight relative before:content-[''] before:absolute before:-bottom-1 before:left-0 before:w-0 before:h-0.5 before:bg-indigo-500 group-hover:before:w-16 before:transition-all before:duration-300 pb-1">
             {quiz.title}
           </h3>
@@ -91,168 +220,94 @@ export default function QuizCard({ quiz }: QuizCardProps) {
             {quiz.description}
           </p>
 
-          <div className="grid grid-cols-2 gap-4 mb-5">
-            <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-4 flex items-center shadow-sm border border-gray-100">
-              <div className="rounded-full bg-indigo-100 p-2 mr-3">
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="text-indigo-600"
-                >
-                  <path
-                    d="M12 6V12L16 14"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <circle
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  />
-                </svg>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-500">Duration</p>
-                <p className="text-sm font-semibold text-gray-800">
-                  {quiz.difficultySettings && quiz.availableDifficulties && quiz.availableDifficulties.length > 0 ? (
-                    <>
-                      {quiz.difficultySettings[quiz.difficulty || "medium"]?.duration || quiz.duration} mins
-                      <span className="ml-1 text-xs text-indigo-600">
-                        (varies by difficulty)
-                      </span>
-                    </>
-                  ) : (
-                    `${quiz.duration} mins`
-                  )}
-                </p>
+          <div className="grid grid-cols-3 gap-3 mb-5">
+            {/* Time Limit */}
+            <div 
+              className="bg-gradient-to-br from-gray-50 to-white rounded-lg p-3 flex flex-col items-center shadow-sm border border-gray-100 cursor-help"
+              title={timeInfo.tooltip}
+            >
+              <span className="text-xs text-gray-500 mb-1">Time Limit</span>
+              <span className="font-semibold text-gray-800 flex items-center gap-1">
+                {timeInfo.displayText}
+                {timeInfo.hasDifferentDurations && (
+                  <span className="text-xs bg-gray-100 text-gray-600 px-1 rounded-sm whitespace-nowrap">
+                    by level
+                  </span>
+                )}
+              </span>
+            </div>
+
+            {/* Difficulty */}
+            <div className="bg-gradient-to-br from-gray-50 to-white rounded-lg p-3 flex flex-col items-center shadow-sm border border-gray-100">
+              <span className="text-xs text-gray-500 mb-1">Difficulty</span>
+              <div className="w-full">
+                {renderDifficultyBadges()}
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-4 flex items-center shadow-sm border border-gray-100">
-              <div
-                className={`rounded-full p-2 mr-3 ${
-                  quiz.difficulty === "easy"
-                    ? "bg-green-100"
-                    : quiz.difficulty === "hard"
-                    ? "bg-red-100"
-                    : "bg-yellow-100"
-                }`}
-              >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className={`${
-                    quiz.difficulty === "easy"
-                      ? "text-green-600"
-                      : quiz.difficulty === "hard"
-                      ? "text-red-600"
-                      : "text-yellow-600"
-                  }`}
-                >
-                  <path
-                    d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M7 7L7.01 7"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-500">Difficulty</p>
-                <p className="text-sm font-semibold text-gray-800">
-                  {quiz.difficulty
-                    ? quiz.difficulty.charAt(0).toUpperCase() +
-                      quiz.difficulty.slice(1)
-                    : "Medium"}
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-4 flex items-center shadow-sm border border-gray-100">
-              <div className="rounded-full bg-indigo-100 p-2 mr-3">
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="text-indigo-600"
-                >
-                  <path
-                    d="M9 11L12 14L22 4"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M21 12V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H16"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-500">Questions</p>
-                <p className="text-sm font-semibold text-gray-800">
-                  {quiz.questions && Array.isArray(quiz.questions)
-                    ? quiz.questions.length
-                    : 1}
-                </p>
-              </div>
+            {/* Questions */}
+            <div 
+              className="bg-gradient-to-br from-gray-50 to-white rounded-lg p-3 flex flex-col items-center shadow-sm border border-gray-100 cursor-help"
+              title={questionInfo.tooltip}
+            >
+              <span className="text-xs text-gray-500 mb-1">Questions</span>
+              <span className="font-semibold text-gray-800 flex items-center gap-1">
+                {questionInfo.displayText}
+                {hasMultipleDiffs && questionInfo.hasVariableCount && (
+                  <span className="text-xs bg-gray-100 text-gray-600 px-1 rounded-sm whitespace-nowrap">
+                    by level
+                  </span>
+                )}
+              </span>
             </div>
           </div>
         </div>
 
-        <div className="p-6 pt-4 bg-gradient-to-b from-white to-gray-50 flex justify-between items-center mt-auto border-t border-gray-100">
-          <span className="text-xs text-gray-500 italic">
-            {formatDistanceToNow(getDateValue(quiz.createdAt), { addSuffix: true })}
-          </span>
+        <div className="p-6 pt-4 bg-gradient-to-b from-white to-gray-50 flex flex-col gap-2 mt-auto border-t border-gray-100">
+          <div className="flex justify-between items-center w-full">
+            <span className="text-xs text-gray-500">
+              {formatDistanceToNow(getDateValue(quiz.createdAt), { addSuffix: true })}
+            </span>
 
-          <motion.div whileTap={{ scale: 0.97 }}>
-            {" "}
-            <button
-              onClick={handleJoinClick}
-              className="py-2.5 px-5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white text-sm font-medium rounded-lg hover:from-indigo-700 hover:to-indigo-800 transition-all duration-300 flex items-center gap-1 shadow-md hover:shadow-lg"
-            >
-              {quiz.requiresAccessCode === false ? "Start Quiz" : "Join Quiz"}
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="ml-1"
+            <div className="flex flex-col gap-1">
+              {hasMultipleDiffs && (
+                <div 
+                  className="text-xs text-gray-500 italic mb-1 flex items-center gap-1 cursor-help"
+                  title={`This quiz offers ${quiz.availableDifficulties?.length} difficulty levels. ${timeInfo.hasDifferentDurations ? 'Time limit varies by selected difficulty.' : ''}`}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 16V12M12 8H12.01M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" 
+                      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Select difficulty after joining
+                </div>
+              )}
+              <motion.div whileTap={{ scale: 0.97 }}>
+                <button
+                onClick={handleJoinClick}
+                className="py-2.5 px-5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white text-sm font-medium rounded-lg hover:from-indigo-700 hover:to-indigo-800 transition-all duration-300 flex items-center gap-1 shadow-md hover:shadow-lg"
               >
-                <path
-                  d="M5 12H19M19 12L12 5M19 12L12 19"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-          </motion.div>
+                {quiz.requiresAccessCode === false ? "Start Quiz" : "Join Quiz"}
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="ml-1"
+                >
+                  <path
+                    d="M5 12H19M19 12L12 5M19 12L12 19"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              </motion.div>
+            </div>
+          </div>
         </div>
       </div>
 

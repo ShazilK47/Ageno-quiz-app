@@ -29,19 +29,24 @@ export function handleFirebaseError(error: unknown): FirestoreErrorResponse {
           code: error.code,
           message: "The email address is not valid.",
           help: "Please check the email format.",
-        };
-      case "auth/user-not-found":
+        };      case "auth/user-not-found":
       case "auth/wrong-password":
+      case "auth/invalid-credential":
         return {
           code: error.code,
           message: "Incorrect email or password.",
           help: "Check your credentials or reset your password.",
-        };
-      case "auth/weak-password":
+        };      case "auth/weak-password":
         return {
           code: error.code,
           message: "The password is too weak.",
           help: "Use a stronger password with at least 6 characters.",
+        };
+      case "auth/network-request-failed":
+        return {
+          code: error.code,
+          message: "Network connection failed.",
+          help: "Please check your internet connection and try again.",
         };
 
       // Firestore errors

@@ -118,38 +118,7 @@ export default function QuizClient({ code }: ClientProps) {
           setError("Quiz not found or no longer active");
           return;
         }
-        
-        // Debug the quiz data with detailed information about difficulty settings
-        console.log("=== QUIZ DATA DEBUG INFO ===");
-        console.log(`Quiz ID: ${quizData.id}`);
-        console.log(`Base duration: ${quizData.duration} minutes`);
-        console.log(`Available difficulties: ${quizData.availableDifficulties?.join(", ") || "none"}`);
-        
-        if (quizData.difficultySettings) {
-          console.log("Difficulty Settings:");
-          for (const [diff, settings] of Object.entries(quizData.difficultySettings)) {
-            console.log(`- ${diff}: ${settings?.duration} mins, ${settings?.pointsMultiplier}x points`);
-          }
-        } else {
-          console.log("No difficulty settings available, will use base duration fallback");
-        }
-        console.log("===========================")
-
-        // Debug the quiz data with detailed information about difficulty settings
-        console.log("=== QUIZ DATA DEBUG INFO ===");
-        console.log(`Quiz ID: ${quizData.id}`);
-        console.log(`Base duration: ${quizData.duration} minutes`);
-        console.log(`Available difficulties: ${quizData.availableDifficulties?.join(", ") || "none"}`);
-        
-        if (quizData.difficultySettings) {
-          console.log("Difficulty Settings:");
-          for (const [diff, settings] of Object.entries(quizData.difficultySettings)) {
-            console.log(`- ${diff}: ${settings.duration} mins, ${settings.pointsMultiplier}x points`);
-          }
-        } else {
-          console.log("No difficulty settings available, will use base duration fallback");
-        }
-        console.log("===========================");
+          // Quiz data loaded with difficulty settings
 
         // Set available difficulties if they exist in quiz data
         if (
@@ -162,26 +131,12 @@ export default function QuizClient({ code }: ClientProps) {
             quizData.availableDifficulties.includes("medium");
           const defaultDifficulty = mediumDifficultyExists
             ? "medium"
-            : quizData.availableDifficulties[0];
-
-          // Set selectedDifficulty here but not difficultySelected
+            : quizData.availableDifficulties[0];          // Set selectedDifficulty here but not difficultySelected
           // This triggers the auto-load effect to load questions for this difficulty
           setSelectedDifficulty(defaultDifficulty);
-          console.log(`Default difficulty set to: ${defaultDifficulty}`);
 
           // Note: We intentionally don't set difficultySelected=true here
           // so that the auto-loading effect can trigger and load questions
-        }
-
-        // Enhanced debugging to understand the data structure
-        console.log("Quiz data loaded:", JSON.stringify(quizData, null, 2));
-        if (quizData.questions) {
-          quizData.questions.forEach((q, i) => {
-            console.log(`Question ${i + 1} options:`, q.options);
-            console.log(`Question ${i + 1} raw data:`, q);
-          });
-        } else {
-          console.log("No questions found in quiz data");
         }
 
         // Temporary fix: If a question has the options property but it's an empty array,
@@ -309,9 +264,9 @@ export default function QuizClient({ code }: ClientProps) {
         const existingQuestions = quiz.questions || [];
 
         // Log the user answers for debugging
-        console.log(
-          `Current user answers before loading: ${userAnswers.length}`
-        );
+        // console.log(
+        //   `Current user answers before loading: ${userAnswers.length}`
+        // );
 
         // Request difficulty-specific questions
         const questions = await getQuestionsByDifficulty(quiz.id, difficulty);
@@ -396,7 +351,6 @@ export default function QuizClient({ code }: ClientProps) {
     },
     [
       quiz,
-      userAnswers.length,
       setUserAnswers,
       setDifficultySelected,
       setError,
@@ -958,11 +912,11 @@ export default function QuizClient({ code }: ClientProps) {
     // If quiz is submitted, show results
     if (quizSubmitted) {
       // Debug: Log the current score value when rendering results
-      console.log("DEBUG - Rendering quiz results with score:", score);
-      console.log(
-        "DEBUG - Calculated score from ref:",
-        lastCalculatedScoreRef.current
-      );
+      // console.log("DEBUG - Rendering quiz results with score:", score);
+      // console.log(
+      //   "DEBUG - Calculated score from ref:",
+      //   lastCalculatedScoreRef.current
+      // );
 
       // CRITICAL: Check for score = 0 but successful submission (indicates mismatch)
       if ((score === 0 || score === null) && responseId) {
@@ -1238,20 +1192,20 @@ export default function QuizClient({ code }: ClientProps) {
     // Show current question
     const currentQuestion = quiz.questions[currentQuestionIndex];
 
-    // Debug the current question to see its structure
-    console.log("Current question:", currentQuestion);
-    console.log(
-      "Options type:",
-      Array.isArray(currentQuestion.options)
-        ? "Array"
-        : typeof currentQuestion.options
-    );
-    console.log(
-      "Options length:",
-      Array.isArray(currentQuestion.options)
-        ? currentQuestion.options.length
-        : "N/A"
-    );
+    // // Debug the current question to see its structure
+    // console.log("Current question:", currentQuestion);
+    // console.log(
+    //   "Options type:",
+    //   Array.isArray(currentQuestion.options)
+    //     ? "Array"
+    //     : typeof currentQuestion.options
+    // );
+    // console.log(
+    //   "Options length:",
+    //   Array.isArray(currentQuestion.options)
+    //     ? currentQuestion.options.length
+    //     : "N/A"
+    // );
 
     // Safety check
     if (!currentQuestion) {
@@ -1332,31 +1286,15 @@ export default function QuizClient({ code }: ClientProps) {
                   timeRemaining={timeRemaining}
                   setTimeRemaining={setTimeRemaining}
                 />
-                
-                {difficultyChangeNotice && (
+                  {difficultyChangeNotice && (
                   <div className="mt-2 text-xs animate-pulse text-indigo-600 font-medium">
                     {difficultyChangeNotice}
-                  </div>
-                )}
-                
-                {/* Simplified debug duration display */}
-                {quiz && (
-                  <div className="mt-1 text-xs text-gray-500">
-                    Current {selectedDifficulty} difficulty selected
                   </div>
                 )}
               </>
             )}
           </div>
-        </div>
-
-        <h3 className="text-xl font-semibold mb-4">{currentQuestion.text}</h3>
-
-        {/* Debug info - will be hidden in production */}
-        <div className="bg-yellow-50 p-2 mb-4 text-xs rounded-md">
-          <p>Debug - Current question ID: {currentQuestion.id}</p>
-          <p>Debug - Correct index: {currentQuestion.correctIndex}</p>
-        </div>
+        </div>        <h3 className="text-xl font-semibold mb-4">{currentQuestion.text}</h3>
 
         <div className="space-y-3 mb-8">
           {currentQuestion.options.map((option, optionIndex) => (
@@ -1390,11 +1328,6 @@ export default function QuizClient({ code }: ClientProps) {
                   {typeof option === "string"
                     ? option
                     : option.text || `Option ${optionIndex + 1}`}
-                </span>
-
-                {/* Debug info - shows internal option index */}
-                <span className="ml-2 text-xs text-gray-400">
-                  (Index: {optionIndex})
                 </span>
               </div>
             </div>
