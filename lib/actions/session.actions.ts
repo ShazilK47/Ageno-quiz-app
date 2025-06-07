@@ -119,17 +119,29 @@ export const checkSession = async (): Promise<{
 }> => {
   try {
     console.log("Sending request to check session");
-    // Add a timeout to prevent hanging
+    
+    // Add a timeout to prevent hanging with better error handling
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3-second timeout
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        controller.abort();
+        reject(new Error('Session check request timed out after 3 seconds'));
+      }, 3000);
+    });
 
-    const response = await fetch("/api/auth/session/check", {
+    // Race between fetch and timeout
+    const fetchPromise = fetch("/api/auth/session/check", {
       method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache"
+      },
       credentials: "include", // Include cookies
       signal: controller.signal,
     });
-
-    clearTimeout(timeoutId);
+    
+    const response = await Promise.race([fetchPromise, timeoutPromise]);
 
     // Try to parse the response regardless of status
     let data;
@@ -168,8 +180,8 @@ export const checkSession = async (): Promise<{
     console.error("Network error checking session:", error);
     return {
       isAuthenticated: false,
-      error: "Network error checking session",
-      reason: "network_error",
+      error: error.message || "Network error checking session",
+      reason: error.name === 'AbortError' ? "timeout" : "network_error",
     };
   }
 };

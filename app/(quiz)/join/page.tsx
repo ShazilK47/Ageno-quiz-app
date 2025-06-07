@@ -14,14 +14,31 @@ export default function JoinQuiz() {
   const [accessCode, setAccessCode] = useState("");
   const router = useRouter();
   // Check auth state but don't block the UI
+  // Add local state to track auth status without blocking render
+  const [authChecked, setAuthChecked] = useState(false);
+  const [userAuthenticated, setUserAuthenticated] = useState(false);
+  
   useEffect(() => {
     const unsubscribe = onAuthChange((user) => {
-      // Auth state is tracked but not currently used in this component
-      console.log("Auth state changed:", !!user);
+      // Track auth state but don't block UI
+      console.log("Join Quiz: Auth state changed:", !!user);
+      setUserAuthenticated(!!user);
+      setAuthChecked(true);
     });
 
-    return () => unsubscribe();
-  }, []);
+    // If auth check takes too long, mark as checked anyway
+    const timeout = setTimeout(() => {
+      if (!authChecked) {
+        console.log("Join Quiz: Auth check timed out, continuing anyway");
+        setAuthChecked(true);
+      }
+    }, 2000); // 2-second timeout
+
+    return () => {
+      unsubscribe();
+      clearTimeout(timeout);
+    };
+  }, [authChecked]);
   useEffect(() => {
     const fetchQuizzes = async () => {
       try {
@@ -98,6 +115,13 @@ export default function JoinQuiz() {
       <main className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl font-bold mb-8 text-center">Join a Quiz</h1>
+          
+          {/* Optional auth status indicator - can be removed if not needed */}
+          {authChecked && userAuthenticated && (
+            <div className="mb-4 text-center text-sm text-green-600">
+              You&apos;re signed in! Your quiz progress will be saved.
+            </div>
+          )}
 
           {/* Quiz code form */}
           <div className="bg-white p-6 rounded-xl shadow-sm mb-10">

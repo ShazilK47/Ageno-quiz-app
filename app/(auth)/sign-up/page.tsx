@@ -21,25 +21,13 @@ const SignUp = () => {
 
   // Set a flag when first navigating to the sign-up page
   useEffect(() => {
-    // Force clear any session cookies when arriving at the sign-up page
-    const clearSessionOnArrival = async () => {
-      try {
-        console.log(
-          "Clearing any existing session cookies on sign-up page arrival"
-        );
-        await fetch("/api/auth/session", {
-          method: "DELETE",
-          credentials: "include",
-        });
-      } catch (e) {
-        console.error("Error clearing session:", e);
-      }
-
-      // Just show the sign-up form without any session checks
-      setCheckingSession(false);
-    };
-
-    clearSessionOnArrival();
+    // No longer automatically clearing session cookies - this causes race conditions
+    // The auth context handles session synchronization properly now
+    
+    // Just show the sign-up form without any session checks
+    setCheckingSession(false);
+    
+    // Set a flag to help with navigation flow
     sessionStorage.setItem("justArrivedAtSignUp", "true");
   }, []);
 

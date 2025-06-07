@@ -30,29 +30,15 @@ function SignInContent() {
     }
   }, [user, router, searchParams]);
 
-  // This extra useEffect helps prevent potential race conditions in navigation
+  // This useEffect helps manage user session and navigation state
   useEffect(() => {
-    // Force clear any session cookies when arriving at the sign-in page
-    const clearSessionOnArrival = async () => {
-      try {
-        console.log(
-          "Clearing any existing session cookies on sign-in page arrival"
-        );
-        await fetch("/api/auth/session", {
-          method: "DELETE",
-          credentials: "include",
-        });
-      } catch (e) {
-        console.error("Error clearing session:", e);
-      }
-    };
-
-    clearSessionOnArrival();
-
     // Set a flag in sessionStorage to indicate we're on the sign-in page
-    // This helps prevent unwanted redirects
+    // This helps prevent unwanted redirects in middleware and other components
     sessionStorage.setItem("onSignInPage", "true");
-
+    
+    // No longer automatically clearing session cookies - this causes race conditions
+    // The auth context handles session synchronization properly now
+    
     return () => {
       // Clean up when component unmounts
       sessionStorage.removeItem("onSignInPage");
