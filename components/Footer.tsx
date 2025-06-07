@@ -51,13 +51,13 @@ const Footer = () => {
               About
             </Link>
             <Link
-              href="/quiz/join"
+              href="/join"
               className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 text-sm"
             >
               Join Quiz
             </Link>
             <Link
-              href="/user/leaderboard"
+              href="/leaderboard"
               className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 text-sm"
             >
               Leaderboard
@@ -82,13 +82,13 @@ const Footer = () => {
               Sign Up
             </Link>
             <Link
-              href="/user/profile"
+              href="/profile"
               className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 text-sm"
             >
               My Profile
             </Link>
             <Link
-              href="/user/my-quizzes"
+              href="/my-quizzes"
               className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 text-sm"
             >
               My Quizzes
@@ -101,16 +101,16 @@ const Footer = () => {
               Contact Us
             </h4>
             <a
-              href="mailto:contact@agenoquiz.com"
+              href="mailto:agenoverse@gmail.com"
               className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 text-sm"
             >
-              contact@agenoquiz.com
+              agenoverse@gmail.com
             </a>
             <a
-              href="tel:+1234567890"
+              href="tel:+92152248647"
               className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 text-sm"
             >
-              +1 (234) 567-890
+              +923152248647
             </a>
             <div className="flex space-x-4 mt-2">
               <a

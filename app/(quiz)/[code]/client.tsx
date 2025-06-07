@@ -713,29 +713,33 @@ export default function QuizClient({ code }: ClientProps) {
       scoreCalculatedRef.current = true;
       // CRITICAL FIX: Store the score in the ref first to ensure it's available
       lastCalculatedScoreRef.current = calculatedScore;
-
-      // We'll use multiple approaches to ensure the score gets set:
-      // 1. Direct state update
+      
+      // Also save to localStorage as a reliable backup
       try {
+        localStorage.setItem(`quiz_score_${quiz.id}`, String(calculatedScore));
+        console.log("Score saved to localStorage as backup:", calculatedScore);
+      } catch (e) {
+        console.warn("Failed to save score to localStorage", e);
+      }
+
+      // FIXED: Simplified score update to prevent "Too many re-renders" error
+      // Update the score just once directly to avoid multiple state updates
+      try {
+        console.log("Setting calculated score in state:", calculatedScore);
         setScore(calculatedScore);
-        console.log("Score set in state:", calculatedScore);
       } catch (err) {
         console.error("Error setting score in state:", err);
-        // If there's any issue with setting the state, we still have the ref
         console.log("Score preserved in ref:", lastCalculatedScoreRef.current);
       }
 
-      // 2. Backup state update with setTimeout to handle any race conditions
+      // Set up a single backup update with setTimeout 
+      // This is non-recursive and won't create render loops
       setTimeout(() => {
-        if (score === null || score === 0) {
-          console.log("Backup score update triggered");
-          try {
-            setScore(lastCalculatedScoreRef.current);
-          } catch (err) {
-            console.error("Error in backup score update:", err);
-          }
-        }
-      }, 0);
+        console.log("Performing backup score update check after 300ms");
+        // Important: Don't check the score state here as it would capture stale values
+        // Instead, unconditionally set from our ref which has the most up-to-date value
+        setScore(lastCalculatedScoreRef.current);
+      }, 300);
 
       // Debug: Log the score state and ref after setting to confirm values
       setTimeout(() => {
@@ -835,19 +839,39 @@ export default function QuizClient({ code }: ClientProps) {
             console.error("Error setting score from backend calculation:", err);
           }
 
-          // Additional safety with a delayed update to handle React state batching issues
-          setTimeout(() => {
-            if (score === null || score === 0) {
-              console.log(
-                "Applying delayed score update from server calculation"
-              );
-              try {
-                setScore(backendScore);
-              } catch (err) {
-                console.error("Error in delayed score update:", err);
-              }
-            }
-          }, 50);
+          // FIXED: Simplified score update with no recursive loops or complex verifications
+          // Set up a single robust score persistence mechanism
+          
+          // First, update the refs and localStorage (these are stable and won't cause re-renders)
+          lastCalculatedScoreRef.current = backendScore;
+          scoreCalculatedRef.current = true;
+
+          try {
+            localStorage.setItem(`quiz_score_${quiz.id}`, String(backendScore));
+            console.log("Score saved to localStorage:", backendScore);
+          } catch (e) {
+            console.warn("Failed to save score to localStorage", e);
+          }
+          
+          // Then handle the state update (which can trigger re-renders)
+          // We'll do this ONCE directly, and then set up non-recursive retries with delays
+          console.log(`Setting score from server calculation: ${backendScore}%`);
+          setScore(backendScore);
+          
+          // Set up a few delayed verification checks that won't cause recursive updates
+          const delayedChecks = [500, 1000, 2000]; // Check at 0.5s, 1s, 2s
+          
+          delayedChecks.forEach((delay, index) => {
+            setTimeout(() => {
+              // Don't read the score state here (would cause closure issues)
+              // Just do an unconditional update from our ref if needed
+              console.log(`Delayed score verification ${index + 1}/${delayedChecks.length}`);
+              
+              // The important part: we're not checking the state or creating recursion
+              // We're just ensuring the state matches our ref at specific intervals
+              setScore(lastCalculatedScoreRef.current);
+            }, delay);
+          });
         } else {
           console.error("Failed to get response ID from submitQuizResponse");
           throw new Error("Failed to get response ID");
@@ -923,12 +947,25 @@ export default function QuizClient({ code }: ClientProps) {
         console.warn(
           "Score inconsistency detected - server successfully processed quiz but score is 0"
         );
-        // Look for server logs that might indicate the real score
-        console.log("Checking for server-side score calculation...");
+        // Try to recover from localStorage if we stored it there as a backup
+        try {
+          const storedScore = localStorage.getItem(`quiz_score_${quiz.id}`);
+          if (storedScore) {
+            const parsedScore = parseInt(storedScore, 10);
+            if (!isNaN(parsedScore) && parsedScore > 0) {
+              console.log(`Recovered score from localStorage: ${parsedScore}%`);
+              setScore(parsedScore);
+              lastCalculatedScoreRef.current = parsedScore;
+              scoreCalculatedRef.current = true;
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to recover score from localStorage", e);
+        }
       }
 
-      // Calculate the correct answers count for display
-      // Enhanced method to ensure proper counting with better logging
+      // Calculate the correct answers count for display with improved algorithm
+      // First attempt: calculate directly from user answers and quiz questions
       let correctAnswersCount = 0;
       const answerDetails = userAnswers.map((answer) => {
         const question = quiz.questions?.find(
@@ -952,33 +989,72 @@ export default function QuizClient({ code }: ClientProps) {
         JSON.stringify(answerDetails, null, 2)
       );
       console.log(
-        `Correct answer count calculated: ${correctAnswersCount} out of ${userAnswers.length}`
+        `Correct answer count calculated from answers: ${correctAnswersCount} out of ${userAnswers.length}`
       );
 
-      // Calculate the correct answer count based on the backend score
-      if (responseId && lastCalculatedScoreRef.current !== null) {
+      // Second attempt: Calculate the correct answer count based on the backend score or most reliable score source
+      let reliableScore = null;
+      
+      // Check all possible score sources in order of reliability
+      if (lastCalculatedScoreRef.current !== null && lastCalculatedScoreRef.current > 0) {
+        reliableScore = lastCalculatedScoreRef.current;
+      } else if (score !== null && score > 0) {
+        reliableScore = score;
+      } else {
+        try {
+          // Last resort: try localStorage
+          const storedScore = localStorage.getItem(`quiz_score_${quiz.id}`);
+          if (storedScore) {
+            const parsedScore = parseInt(storedScore, 10);
+            if (!isNaN(parsedScore) && parsedScore > 0) {
+              reliableScore = parsedScore;
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to check localStorage for score", e);
+        }
+      }
+      
+      // If we have a reliable score, use it to calculate the correct answers
+      if (reliableScore !== null && quiz.questions && quiz.questions.length > 0) {
         const calculatedCorrectCount = Math.round(
-          (lastCalculatedScoreRef.current / 100) * quiz.questions.length
+          (reliableScore / 100) * quiz.questions.length
         );
         console.log(
-          `Using backend score to calculate correct answers: ${calculatedCorrectCount} out of ${quiz.questions.length}`
+          `Using reliable score ${reliableScore}% to calculate correct answers: ${calculatedCorrectCount} out of ${quiz.questions.length}`
         );
-        correctAnswersCount = calculatedCorrectCount;
+        
+        // Only override if the calculated count seems more accurate
+        if (calculatedCorrectCount > correctAnswersCount || calculatedCorrectCount > 0) {
+          correctAnswersCount = calculatedCorrectCount;
+        }
       }
 
       // CRITICAL FIX: Enhanced score calculation and display
-      let displayScore = score;
+      let displayScore = null;
+      
+      // Find the most reliable displayScore value
+      if (score !== null && score > 0) {
+        displayScore = score;
+      } else if (lastCalculatedScoreRef.current !== null && lastCalculatedScoreRef.current > 0) {
+        displayScore = lastCalculatedScoreRef.current;
+      } else if (correctAnswersCount > 0 && quiz.questions && quiz.questions.length > 0) {
+        // Last resort: calculate from correct answers count
+        const pointsMultiplier = getDifficultyMultiplier(quiz, selectedDifficulty);
+        displayScore = Math.min(100, Math.round((correctAnswersCount / quiz.questions.length) * 100 * pointsMultiplier));
+      } else {
+        displayScore = 0;
+      }
 
-      // Always log the current state for debugging
-      console.log("Rendering results - score state:", score);
-      console.log(
-        "Rendering results - score ref:",
-        lastCalculatedScoreRef.current
-      );
-      console.log(
-        "Rendering results - score calculated flag:",
-        scoreCalculatedRef.current
-      );
+      // Comprehensive logging for debugging
+      console.log("Rendering results - final score determination:", {
+        scoreState: score,
+        scoreRef: lastCalculatedScoreRef.current,
+        calculatedFlag: scoreCalculatedRef.current,
+        correctAnswers: correctAnswersCount,
+        totalQuestions: quiz.questions?.length || 0,
+        finalDisplayScore: displayScore
+      });
       console.log("Rendering results - correct answers:", correctAnswersCount);
       console.log(
         "Rendering results - total questions:",
