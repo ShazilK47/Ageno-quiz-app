@@ -13,6 +13,9 @@ const PUBLIC_PATHS = [
   "/leaderboard", // Make leaderboard publicly accessible 
 ];
 
+// Quiz related patterns that need special handling
+const QUIZ_CODE_PATTERN = /^\/[A-Za-z0-9]{6,}$/; // Matches /{code} where code is 6+ alphanumeric chars
+
 // More robust path checking with wildcard support
 const pathStartsWith = (path: string, prefixes: string[]): boolean => {
   // Normalize path for consistent comparison
@@ -39,7 +42,7 @@ export async function middleware(request: NextRequest) {
   const userRole = request.cookies.get("user_role")?.value;
   const pathname = request.nextUrl.pathname;
 
-  // Enhanced public path check with specific API paths that don't require auth
+  // Enhanced public path check with improved quiz code pattern matching
   const isPublicPath = 
     PUBLIC_PATHS.includes(pathname) ||
     pathname.startsWith("/api/auth/session") ||
@@ -47,6 +50,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/join") ||
     pathname.startsWith("/quiz/join") ||
     pathname.startsWith("/leaderboard") ||
+    QUIZ_CODE_PATTERN.test(pathname) || // Match quiz code URLs like /ABC123
     // Add static assets paths to avoid auth checks
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||

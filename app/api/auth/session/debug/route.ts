@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { headers } from "next/headers";
+import { auth } from "@/firebase/admin";
 
 /**
  * Debug endpoint to check session cookie state 
- * This helps diagnose authentication issues
+ * Provides extended diagnostics for mobile/browser debugging
  */
 export async function GET() {
   try {
@@ -13,13 +15,51 @@ export async function GET() {
 
     // Get all cookies for debugging
     const allCookies = cookiesStore.getAll();
+    
+    // Get headers for device info
+    const headersList = await headers();
+    const userAgent = headersList.get('user-agent') || 'unknown';
+    
+    // Mobile detection (similar to client-side)
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+    
+    // Verify the session cookie if it exists
+    let sessionValid = false;
+    let sessionData = null;
+    let sessionError = null;
+    
+    if (sessionCookie) {
+      try {
+        const decodedClaims = await auth.verifySessionCookie(sessionCookie, true);
+        sessionValid = true;
+        sessionData = {
+          uid: decodedClaims.uid,
+          email: decodedClaims.email,
+          role: decodedClaims.role || 'user'
+        };
+      } catch (error) {
+        sessionError = error instanceof Error ? error.message : 'Unknown error';
+      }
+    }
 
     return NextResponse.json({
-      hasCookies: allCookies.length > 0,
-      hasSessionCookie: !!sessionCookie,
-      cookieNames: allCookies.map(cookie => cookie.name),
-      sessionCookieLength: sessionCookie ? sessionCookie.length : 0,
-      userRole: userRole || null,
+      device: {
+        userAgent,
+        isMobile,
+        platform: headersList.get('sec-ch-ua-platform') || 'unknown'
+      },
+      cookies: {
+        hasCookies: allCookies.length > 0,
+        hasSessionCookie: !!sessionCookie,
+        cookieNames: allCookies.map(cookie => cookie.name),
+        sessionCookieLength: sessionCookie ? sessionCookie.length : 0,
+        userRole: userRole || null
+      },
+      session: {
+        valid: sessionValid,
+        data: sessionData,
+        error: sessionError
+      },
       timestamp: new Date().toISOString()
     }, {
       headers: {
