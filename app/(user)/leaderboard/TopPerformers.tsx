@@ -10,6 +10,9 @@ interface TopPerformersProps {
     completedAt: Date;
     rank?: number;
     normalizedScore?: number;
+    uniqueQuizCount?: number;
+    totalAttempts?: number;
+    masteryLevel?: string;
   }>;
   showGlobalRanking?: boolean;
 }
@@ -56,13 +59,26 @@ export default function TopPerformers({
               <div>
                 <h3 className="font-bold text-lg line-clamp-1">
                   {entry.username}
-                </h3>
-                <p className="text-sm text-gray-500 line-clamp-1">
-                  {showGlobalRanking ? entry.quizTitle : entry.quizTitle}
+                </h3>                <p className="text-sm text-gray-500 line-clamp-1">
+                  {showGlobalRanking 
+                    ? `${entry.uniqueQuizCount || 0} unique (${entry.totalAttempts || 0} total)` 
+                    : entry.quizTitle}
                 </p>
               </div>
-            </div>
-            <div className="flex justify-between text-sm text-gray-600">
+            </div>            <div className="flex justify-between text-sm text-gray-600">
+              {showGlobalRanking && (
+                <div>
+                  <p className="font-medium">Mastery</p>
+                  <p className={`text-lg font-bold ${
+                    entry.masteryLevel === "Master" ? "text-purple-600" :
+                    entry.masteryLevel === "Expert" ? "text-blue-600" :
+                    entry.masteryLevel === "Advanced" ? "text-indigo-600" :
+                    entry.masteryLevel === "Practiced" ? "text-yellow-600" : "text-green-600"
+                  }`}>
+                    {entry.masteryLevel || "Beginner"}
+                  </p>
+                </div>
+              )}
               <div>
                 <p className="font-medium">
                   {showGlobalRanking ? "Avg. Score" : "Score"}
@@ -82,12 +98,6 @@ export default function TopPerformers({
                 </p>
                 <p className="text-lg">{formatTime(entry.timeTaken)}</p>
               </div>
-              <div>
-                <p className="font-medium">
-                  {showGlobalRanking ? "Latest" : "Date"}
-                </p>
-                <p>{formatDate(entry.completedAt)}</p>
-              </div>
             </div>
           </div>
         ))}
@@ -100,11 +110,4 @@ function formatTime(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const remainingSecs = seconds % 60;
   return `${minutes}m ${remainingSecs}s`;
-}
-
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-  }).format(date);
 }

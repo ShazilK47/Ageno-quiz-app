@@ -12,6 +12,9 @@ export interface UserRankProps {
     timeTaken: number;
     rank?: number;
     normalizedScore?: number;
+    uniqueQuizCount?: number;
+    totalAttempts?: number;
+    masteryLevel?: string;
   } | null;
   isLoading: boolean;
   isGlobalRanking?: boolean;
@@ -67,9 +70,35 @@ export default function UserRank({
                 : `Based on your performance in ${currentUserEntry.quizTitle}`}
             </p>
           </div>
-        </div>
-
-        <div className="flex gap-6">
+        </div>        <div className="flex gap-6">
+          {isGlobalRanking && (
+            <>
+              <div className="text-center">
+                <p className="text-xs text-gray-500 uppercase tracking-wide">
+                  Unique Quizzes
+                </p>
+                <p className="text-lg font-bold text-indigo-700">
+                  {currentUserEntry.uniqueQuizCount || 0}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {currentUserEntry.totalAttempts || 0} total attempts
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-gray-500 uppercase tracking-wide">
+                  Mastery Level
+                </p>
+                <p className={`text-lg font-bold ${
+                  currentUserEntry.masteryLevel === "Master" ? "text-purple-700" :
+                  currentUserEntry.masteryLevel === "Expert" ? "text-blue-700" :
+                  currentUserEntry.masteryLevel === "Advanced" ? "text-indigo-700" :
+                  currentUserEntry.masteryLevel === "Practiced" ? "text-yellow-700" : "text-green-700"
+                }`}>
+                  {currentUserEntry.masteryLevel || "Beginner"}
+                </p>
+              </div>
+            </>
+          )}
           <div className="text-center">
             <p className="text-xs text-gray-500 uppercase tracking-wide">
               {isGlobalRanking ? "Avg. Score" : "Score"}

@@ -30,6 +30,9 @@ type LeaderboardEntry = {
   difficulty?: string;
   userId?: string;
   normalizedScore?: number; // Score adjusted for difficulty
+  uniqueQuizCount?: number; // Number of unique quizzes completed
+  totalAttempts?: number; // Total number of quiz attempts/completions
+  masteryLevel?: string; // Calculated mastery level based on attempts
 };
 
 // Difficulty multipliers for score normalization
@@ -267,6 +270,8 @@ const LeaderboardPage = () => {
               bestTime: number;
               latestCompletion: Date;
               entries: LeaderboardEntry[];
+              uniqueQuizIds: Set<string>; // Track unique quiz IDs
+              totalAttempts: number; // Track total attempts
             }
           > = {};
 
@@ -282,13 +287,25 @@ const LeaderboardPage = () => {
                 bestTime: Infinity,
                 latestCompletion: new Date(0),
                 entries: [],
+                uniqueQuizIds: new Set<string>(),
+                totalAttempts: 0,
               };
             }
 
             // Add this entry's score to user's total
             userScores[entry.userId].totalNormalizedScore +=
               entry.normalizedScore || 0;
+            
+            // Increment total attempts counter
+            userScores[entry.userId].totalAttempts += 1;
+            
+            // Add to quiz count (this represents the old way - will be kept for comparison)
             userScores[entry.userId].quizCount += 1;
+            
+            // Add this quiz ID to the unique set if it exists
+            if (entry.quizId) {
+              userScores[entry.userId].uniqueQuizIds.add(entry.quizId);
+            }
 
             // Track user's best time (lowest value)
             if (entry.timeTaken < userScores[entry.userId].bestTime) {
@@ -304,6 +321,26 @@ const LeaderboardPage = () => {
             userScores[entry.userId].entries.push(entry);
           });
 
+          // Function to calculate mastery level based on unique quizzes and total attempts
+          const calculateMasteryLevel = (uniqueCount: number, totalAttempts: number): string => {
+            if (uniqueCount === 0) return "Beginner";
+            
+            // Calculate average attempts per quiz
+            const avgAttemptsPerQuiz = totalAttempts / uniqueCount;
+            
+            if (uniqueCount >= 20) {
+              return "Master";
+            } else if (uniqueCount >= 10) {
+              return "Expert";
+            } else if (uniqueCount >= 5) {
+              return "Advanced";
+            } else if (avgAttemptsPerQuiz >= 3) {
+              return "Practiced";
+            } else {
+              return "Beginner";
+            }
+          };
+          
           // Create aggregated entries for global leaderboard
           const aggregatedEntries: LeaderboardEntry[] = Object.values(
             userScores
@@ -313,19 +350,29 @@ const LeaderboardPage = () => {
               (a, b) => b.completedAt.getTime() - a.completedAt.getTime()
             )[0];
 
+            // Get the count of unique quizzes
+            const uniqueQuizCount = userData.uniqueQuizIds.size;
+            
+            // Get the total attempts count
+            const totalAttempts = userData.totalAttempts;
+            
+            // Calculate mastery level
+            const masteryLevel = calculateMasteryLevel(uniqueQuizCount, totalAttempts);
+
             // Create a combined entry with aggregate scores
             return {
               ...mostRecentEntry,
               id: `global-${userData.userId}`,
-              quizTitle: `${userData.quizCount} quiz${
-                userData.quizCount !== 1 ? "zes" : ""
-              } completed`,
+              quizTitle: `${uniqueQuizCount}/${totalAttempts} completed`,
               score: Math.round(
                 userData.totalNormalizedScore / userData.quizCount
               ),
               normalizedScore: userData.totalNormalizedScore,
               timeTaken: userData.bestTime,
               completedAt: userData.latestCompletion,
+              uniqueQuizCount,
+              totalAttempts,
+              masteryLevel,
             };
           });
 
@@ -495,10 +542,10 @@ const LeaderboardPage = () => {
                         User
                       </th>
                       <th className="py-4 px-6 text-left text-gray-500 font-medium">
-                        {!category ? "Quizzes Completed" : "Quiz"}
+                        {!category ? "Unique Quizzes" : "Quiz"}
                       </th>
                       <th className="py-4 px-6 text-left text-gray-500 font-medium">
-                        {!category ? "Best Difficulty" : "Difficulty"}
+                        {!category ? "Mastery Level" : "Difficulty"}
                       </th>
                       <th className="py-4 px-6 text-left text-gray-500 font-medium">
                         {!category ? "Avg. Score" : "Score"}
@@ -545,20 +592,45 @@ const LeaderboardPage = () => {
                           {entry.username}
                         </td>
                         <td className="py-4 px-6 text-gray-700">
-                          {entry.quizTitle}
+                          {!category 
+                            ? `${entry.uniqueQuizCount || 0} unique` 
+                            : entry.quizTitle}
+                          {!category && (
+                            <span className="block text-xs text-gray-500">
+                              ({entry.totalAttempts || 0} total attempts)
+                            </span>
+                          )}
                         </td>
                         <td className="py-4 px-6">
-                          <span
-                            className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                              entry.difficulty === "hard"
-                                ? "bg-red-100 text-red-800"
-                                : entry.difficulty === "medium"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-green-100 text-green-800"
-                            }`}
-                          >
-                            {entry.difficulty || "Basic"}
-                          </span>
+                          {!category ? (
+                            <span
+                              className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                                entry.masteryLevel === "Master"
+                                  ? "bg-purple-100 text-purple-800"
+                                  : entry.masteryLevel === "Expert"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : entry.masteryLevel === "Advanced"
+                                  ? "bg-indigo-100 text-indigo-800"
+                                  : entry.masteryLevel === "Practiced"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-green-100 text-green-800"
+                              }`}
+                            >
+                              {entry.masteryLevel || "Beginner"}
+                            </span>
+                          ) : (
+                            <span
+                              className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                                entry.difficulty === "hard"
+                                  ? "bg-red-100 text-red-800"
+                                  : entry.difficulty === "medium"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-green-100 text-green-800"
+                              }`}
+                            >
+                              {entry.difficulty || "Basic"}
+                            </span>
+                          )}
                         </td>{" "}
                         <td className="py-4 px-6">
                           <span className="font-bold text-indigo-600">
