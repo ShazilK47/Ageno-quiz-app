@@ -492,7 +492,7 @@ const LeaderboardPage = () => {
             category={category}
             difficulty={difficulty}
             onFilterChange={handleFilterChange}
-          />{" "}
+          />
           {/* Current User Rank Card */}
           {user && (
             <UserRank
@@ -531,7 +531,6 @@ const LeaderboardPage = () => {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                {" "}
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b">
                     <tr>
@@ -612,12 +611,11 @@ const LeaderboardPage = () => {
                                   : entry.masteryLevel === "Advanced"
                                   ? "bg-indigo-100 text-indigo-800"
                                   : entry.masteryLevel === "Practiced"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-green-100 text-green-800"
-                              }`}
-                            >
-                              {entry.masteryLevel || "Beginner"}
-                            </span>
+                                  ? "bg-yellow-100 text-yellow-800"                              : "bg-green-100 text-green-800"
+                            }`}
+                          >
+                            {entry.masteryLevel || "Beginner"}
+                          </span>
                           ) : (
                             <span
                               className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
@@ -631,7 +629,7 @@ const LeaderboardPage = () => {
                               {entry.difficulty || "Basic"}
                             </span>
                           )}
-                        </td>{" "}
+                        </td>
                         <td className="py-4 px-6">
                           <span className="font-bold text-indigo-600">
                             {entry.score}%
@@ -654,7 +652,7 @@ const LeaderboardPage = () => {
                 </table>
               </div>
             )}
-          </div>{" "}
+          </div>
           {/* Top Performers Component */}
           <TopPerformers
             topEntries={leaderboardData.slice(0, 3)}
