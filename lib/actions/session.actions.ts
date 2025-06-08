@@ -77,11 +77,35 @@ export const createSession = async (user: User): Promise<SessionResult> => {
 };
 
 // Clear session cookie from the server
-export const clearSession = async (): Promise<SessionResult> => {
+export const clearSession = async (forceLogout = false): Promise<SessionResult> => {
   try {
+    // Add safety mechanism to prevent accidental session deletion
+    if (!forceLogout) {
+      // Check if session is being cleared during normal application use
+      const isUserInitiated = sessionStorage.getItem('user_initiated_logout') === 'true';
+      
+      if (!isUserInitiated) {
+        console.warn("Prevented automatic session deletion. Use forceLogout=true for forced logouts.");
+        return {
+          success: false,
+          error: "Automatic session deletion prevented for user safety",
+        };
+      }
+    }
+    
+    const headers: HeadersInit = {
+      'Cache-Control': 'no-cache, no-store, must-revalidate', // Prevent caching
+    };
+    
+    // Add force logout header when explicitly requested
+    if (forceLogout) {
+      headers['X-Force-Logout'] = 'true';
+    }
+    
     const response = await fetch("/api/auth/session", {
       method: "DELETE",
       credentials: "include", // Include cookies
+      headers,
     });
 
     if (!response.ok) {
@@ -97,6 +121,11 @@ export const clearSession = async (): Promise<SessionResult> => {
         error: data.error || `Failed to clear session (${response.status})`,
         details: data,
       };
+    }
+
+    // Clear the logout flag after successful logout
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('user_initiated_logout');
     }
 
     return { success: true };

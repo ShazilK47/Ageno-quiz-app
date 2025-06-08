@@ -235,8 +235,29 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   try {
+    // Add protection against accidental or automated logout requests
+    // Check for special header that indicates this is a deliberate logout
+    const isForceLogout = request.headers.get('X-Force-Logout') === 'true';
+    
+    // Get the referer to check where the request is coming from
+    const referer = request.headers.get('referer') || 'unknown';
+    console.log(`Session deletion requested from: ${referer}`);
+
+    // If this is not a force logout and it came from HMR or unexpected source, block it
+    if (!isForceLogout && (
+      referer.includes('_next/static') || 
+      referer.includes('webpack') || 
+      referer === 'unknown'
+    )) {
+      console.warn("Blocked potentially accidental session deletion from:", referer);
+      return NextResponse.json({ 
+        success: false,
+        error: "Session deletion blocked - not recognized as intentional logout" 
+      }, { status: 400 });
+    }
+    
     const cookiesStore = await cookies();
 
     // Clear session cookie
@@ -255,6 +276,7 @@ export async function DELETE() {
       path: "/",
     });
 
+    console.log("Session deleted successfully");
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error("Session deletion error:", error);

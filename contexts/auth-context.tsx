@@ -290,14 +290,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           } catch (error) {
             console.error("Error processing authenticated user:", error);
             setLoading(false);
+          }      } else {
+        // Check if this is a genuine logout vs a development glitch
+        const wasLoggedOut = typeof window !== 'undefined' && 
+          sessionStorage.getItem('user_initiated_logout') === 'true';
+        
+        // Unexpected auth state change (not user initiated)
+        if (!wasLoggedOut && user) {
+          console.log("Detected unexpected auth state change to logged out, checking session first...");
+          
+          // Verify with server before assuming logout
+          try {
+            const sessionCheck = await checkSession();
+            if (sessionCheck.isAuthenticated) {
+              console.log("Server still has valid session, ignoring client-side logout signal");
+              return; // Keep current user state
+            }
+          } catch (error) {
+            console.error("Error checking session during logout verification:", error);
           }
-        } else {
-          // User is signed out
+        }
+        
+        // User is deliberately signed out or server confirms no session
+        if (wasLoggedOut) {
           // First clear session on server to maintain consistency
-          await clearSession().catch(err => console.warn("Error clearing session:", err));
+          await clearSession(true).catch(err => console.warn("Error clearing session:", err));
+        }
 
-          // Then clear local state
-          setUser(null);
+        // Then clear local state
+        setUser(null);
           setIsAdmin(false);
           clearSessionData();
           
@@ -439,40 +460,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       return { success: false, error: error.message };
     }
   };
-  const logout = async () => {
+  // User logs out
+  const logout = async (): Promise<boolean> => {
     try {
-      // First clear the session on the server to invalidate the session cookie
-      try {
-        await clearSession();
-      } catch (clearError) {
-        console.warn("Error clearing server session during logout:", clearError);
-        // Continue with logout even if server session clear fails
-      }
+      console.log("Starting logout process");
 
-      // Then update UI state 
+      // Set flag to indicate this is a user-initiated logout
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('user_initiated_logout', 'true');
+      }
+      
+      // First clear session on server to maintain consistency
+      await clearSession(true).catch((err) => console.warn("Error clearing session:", err));
+
+      // Then sign out from Firebase client
+      await signOut();
+      
+      // Clear local state
       setUser(null);
       setIsAdmin(false);
       
-      // Clear local storage and session data
-      clearSessionData();
-      
-      // Clear any refresh timers
+      // Clear any refresh timer
       if (refreshTimerRef.current) {
         clearInterval(refreshTimerRef.current);
         refreshTimerRef.current = null;
       }
 
-      // Finally sign out from Firebase
-      const result = await signOut();
-      return result;
+      // Also clear client-side stored data
+      clearSessionData();
+      
+      console.log("Logout completed successfully");
+      return true;
     } catch (error) {
       console.error("Error during logout:", error);
-      
-      // Even if Firebase logout fails, we want to ensure client state is cleared
-      clearSessionData();
-      setUser(null);
-      setIsAdmin(false);
-      
       return false;
     }
   };
