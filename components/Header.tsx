@@ -158,13 +158,13 @@ export default function Header() {
           {/* Admin-only mobile navigation links */}
           {user && isAdmin && (
             <>
-              <div className="py-2 border-t border-neutral-200 dark:border-neutral-700">
+              <div className="py-1 border-t border-neutral-200 dark:border-neutral-700">
                 <div className="px-2 py-1 text-sm font-medium text-gray-500">
                   Admin
                 </div>
               </div>
               <MobileNavLink
-                href="/admin/dashboard"
+                href="/dashboard"
                 onClick={() => setMenuOpen(false)}
               >
                 <span className="flex items-center">
@@ -181,7 +181,7 @@ export default function Header() {
                 </span>
               </MobileNavLink>
               <MobileNavLink
-                href="/admin/quizzes"
+                href="/quizzes"
                 onClick={() => setMenuOpen(false)}
               >
                 <span className="flex items-center">
@@ -203,8 +203,9 @@ export default function Header() {
               </MobileNavLink>
             </>
           )}
-          <div className="pt-2 border-t border-neutral-200 dark:border-neutral-700">
-            <UserProfile isMobile />
+          <div className="pt-2 border-t border-neutral-200 dark:border-neutral-700 mt-2">
+            {/* Explicitly pass user and isAdmin props to ensure visibility */}
+            <UserProfile isMobile={true} />
           </div>
         </nav>
       </div>

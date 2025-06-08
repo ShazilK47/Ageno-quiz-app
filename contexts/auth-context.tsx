@@ -81,9 +81,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Create refs to track authentication processes and prevent multiple simultaneous calls
+  const sessionCheckInProgressRef = useRef(false);
+  const sessionCreationInProgressRef = useRef(false);
+
   // More robust session verification that returns server user data when available
   const verifySession = async (): Promise<boolean> => {
+    if (sessionCheckInProgressRef.current) {
+      console.log("Session check already in progress, skipping duplicate call");
+      return !!user;
+    }
+    
     console.log("Starting verifySession function in auth context");
+    sessionCheckInProgressRef.current = true;
+    
     try {
       // Use the session.actions checkSession helper which already has proper error handling
       const sessionCheck = await checkSession();
@@ -123,6 +134,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       console.error("Session verification error:", error);
       return false;
+    } finally {
+      // Always reset the in-progress flag when done
+      sessionCheckInProgressRef.current = false;
     }
   };
 
@@ -246,11 +260,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             storeUserData(userWithRole);
             storeAuthToken(token.token, 3600); // 1 hour
 
-            // Sync with server - our improved session service ensures we don't create a 
-            // duplicate session if one already exists
-            const syncResult = await synchronizeAuthState(firebaseUser);
-            if (!syncResult.inSync) {
-              console.warn("Auth state sync issues:", syncResult);
+            // Sync with server - check if session already exists before creating a new one
+            const sessionCheck = await checkSession();
+            
+            if (!sessionCheck.isAuthenticated && !sessionCreationInProgressRef.current) {
+              try {
+                // Set flag to prevent duplicate calls
+                sessionCreationInProgressRef.current = true;
+                
+                console.log("No valid session found, creating new session");
+                const sessionResult = await createSession(firebaseUser);
+                if (!sessionResult.success) {
+                  console.error("Failed to create session:", sessionResult.error);
+                } else {
+                  console.log("Session created successfully");
+                }
+              } finally {
+                // Reset flag regardless of outcome
+                setTimeout(() => {
+                  sessionCreationInProgressRef.current = false;
+                }, 1000);
+              }
+            } else {
+              console.log("Valid session already exists or creation in progress, skipping session creation");
             }
 
             setUser(userWithRole);
@@ -291,7 +323,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         refreshTimerRef.current = null;
       }
     };
-  }, [/* setupTokenRefresh is created on each render but doesn't need to trigger useEffect */]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const signUp = async (
     email: string,
     password: string,
@@ -320,14 +353,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const idToken = await result.getIdToken();
           storeAuthToken(idToken, 3600); // Store for 1 hour
           
-          // Create session after successful login
-          const sessionResult = await createSession(result);
-          if (!sessionResult.success) {
-            console.error("Session creation failed:", sessionResult.error);
-            return {
-              success: false,
-              error: "Failed to create session. Please try again.",
-            };
+          // Check if session creation is already in progress to prevent duplicates
+          if (!sessionCreationInProgressRef.current) {
+            // Set the flag to prevent parallel session creations
+            sessionCreationInProgressRef.current = true;
+            
+            try {
+              const sessionResult = await createSession(result);
+              if (!sessionResult.success) {
+                console.error("Session creation failed:", sessionResult.error);
+                return {
+                  success: false,
+                  error: "Failed to create session. Please try again.",
+                };
+              }
+            } finally {
+              // Reset the flag with a small delay to prevent race conditions
+              setTimeout(() => {
+                sessionCreationInProgressRef.current = false;
+              }, 1000);
+            }
+          } else {
+            console.log("Session creation already in progress, skipping duplicate request");
           }
         } catch (sessionError: any) {
           console.error("Session error:", sessionError);
@@ -352,14 +399,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const result = await signInWithGoogle();
       if ("uid" in result) {
         try {
-          // Create session after successful Google login
-          const sessionResult = await createSession(result);
-          if (!sessionResult.success) {
-            console.error("Session creation failed:", sessionResult.error);
-            return {
-              success: false,
-              error: "Failed to create session. Please try again.",
-            };
+          // Check if session creation is already in progress to prevent duplicates
+          if (!sessionCreationInProgressRef.current) {
+            // Set the flag to prevent parallel session creations
+            sessionCreationInProgressRef.current = true;
+            
+            try {
+              const sessionResult = await createSession(result);
+              if (!sessionResult.success) {
+                console.error("Session creation failed:", sessionResult.error);
+                return {
+                  success: false,
+                  error: "Failed to create session. Please try again.",
+                };
+              }
+            } finally {
+              // Reset the flag with a small delay to prevent race conditions
+              setTimeout(() => {
+                sessionCreationInProgressRef.current = false;
+              }, 1000);
+            }
+          } else {
+            console.log("Session creation already in progress for Google login, skipping duplicate request");
           }
         } catch (sessionError: any) {
           console.error("Session error:", sessionError);

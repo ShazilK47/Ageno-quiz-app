@@ -72,7 +72,7 @@ export default function UserProfile({ isMobile = false }: UserProfileProps) {
   if (isMobile) {
     return (
       <div>
-        <div className="flex items-center gap-3 mb-3">
+        <div className="flex items-center gap-3 mb-3 z-50">
           <div className="h-10 w-10 rounded-full bg-gradient-to-r from-purple-600 to-blue-500 flex items-center justify-center text-white font-bold shadow-md">
             {displayName.charAt(0).toUpperCase()}
           </div>
@@ -81,10 +81,10 @@ export default function UserProfile({ isMobile = false }: UserProfileProps) {
             <span className="text-xs text-gray-500">{user.email}</span>
           </div>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-2 flex flex-row ">
           <Link
             href="/profile"
-            className=" w-full text-left py-2 px-3 rounded-md text-gray-700 hover:bg-gray-100 transition flex items-center"
+            className=" w-[50%] mr-5 text-left py-2 px-3 rounded-md text-gray-700 hover:bg-gray-100 transition flex items-center"
           >
             <svg
               className="w-5 h-5 mr-2"
@@ -102,38 +102,9 @@ export default function UserProfile({ isMobile = false }: UserProfileProps) {
             My Profile
           </Link>
 
-          {/* Only show admin dashboard link to admins */}
-          {isAdmin && (
-            <Link
-              href="/dashboard"
-              className="w-full text-left py-2 px-3 rounded-md text-gray-700 hover:bg-gray-100 transition flex items-center"
-            >
-              <svg
-                className="w-5 h-5 mr-2"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-              Admin Dashboard
-            </Link>
-          )}
-
-          <button
+           <button
             onClick={handleSignOut}
-            className=" w-full text-left py-2 px-3 rounded-md text-red-600 hover:bg-red-50 transition flex items-center"
+            className="w-[50%] text-left py-2 px-3 rounded-md text-red-600 hover:bg-red-50 transition flex items-center"
           >
             <svg
               className="w-5 h-5 mr-2"
@@ -150,7 +121,11 @@ export default function UserProfile({ isMobile = false }: UserProfileProps) {
             </svg>
             Sign Out
           </button>
+
         </div>
+        {/* <div className="mt-2">
+         
+        </div> */}
       </div>
     );
   }
@@ -242,7 +217,7 @@ export default function UserProfile({ isMobile = false }: UserProfileProps) {
               <Menu.Item>
                 {({ active }) => (
                   <Link
-                    href="/admin/dashboard"
+                    href="/dashboard"
                     className={`${
                       active
                         ? "bg-accent-primary/10 text-accent-primary"

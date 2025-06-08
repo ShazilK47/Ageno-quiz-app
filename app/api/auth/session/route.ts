@@ -110,13 +110,40 @@ export async function POST(request: NextRequest) {
         console.warn("Could not update custom claims:", claimsError);
       }
 
-      // Create a session cookie with additional logging
+      // Create a session cookie with additional logging and deduplication
       let sessionCookie;
       try {
-        sessionCookie = await auth.createSessionCookie(idToken, {
-          expiresIn: SESSION_EXPIRATION_TIME * 1000, // Firebase Auth uses milliseconds
-        });
-        console.log("Session cookie created successfully");
+        // Check if there's already a valid session for this user
+        const existingSessionCookie = request.cookies.get("session")?.value;
+        let createNewSession = true;
+        
+        if (existingSessionCookie) {
+          try {
+            // Verify if there's a valid session already
+            const decodedSession = await auth.verifySessionCookie(
+              existingSessionCookie,
+              true // checkRevoked
+            );
+            
+            // If the existing session is for the same user, skip creating a new one
+            if (decodedSession && decodedSession.uid === uid) {
+              console.log("Valid session already exists for user:", uid);
+              sessionCookie = existingSessionCookie;
+              createNewSession = false;
+            }
+          } catch {
+            // Existing session is invalid or revoked, continue to create a new one
+            console.log("Existing session invalid, creating new session");
+          }
+        }
+
+        if (createNewSession) {
+          sessionCookie = await auth.createSessionCookie(idToken, {
+            expiresIn: SESSION_EXPIRATION_TIME * 1000, // Firebase Auth uses milliseconds
+          });
+          console.log("Session cookie created successfully for user:", uid);
+        }
+        
       } catch (cookieError: any) {
         console.error("Failed to create session cookie:", cookieError);
 
@@ -143,15 +170,24 @@ export async function POST(request: NextRequest) {
       const cookiesStore = await cookies();
 
       // Set session cookie for authentication
-      cookiesStore.set({
-        name: "session",
-        value: sessionCookie,
-        maxAge: SESSION_EXPIRATION_TIME,
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production", // Secure in production
-        path: "/",
-        sameSite: "lax", // Changed from strict to lax for better compatibility
-      });
+      // Make sure sessionCookie is not undefined before setting it
+      if (sessionCookie) {
+        cookiesStore.set({
+          name: "session",
+          value: sessionCookie,
+          maxAge: SESSION_EXPIRATION_TIME,
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production", // Secure in production
+          path: "/",
+          sameSite: "lax", // Changed from strict to lax for better compatibility
+        });
+      } else {
+        console.error("Cannot set session cookie: value is undefined");
+        return NextResponse.json(
+          { error: "Failed to create session cookie - value is undefined" }, 
+          { status: 500 }
+        );
+      }
 
       // Set user role cookie for authorization in middleware
       cookiesStore.set({

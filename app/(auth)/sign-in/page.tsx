@@ -30,20 +30,34 @@ function SignInContent() {
     }
   }, [user, router, searchParams]);
 
-  // This useEffect helps manage user session and navigation state
+  // This useEffect manages auth session state check on the sign-in page
   useEffect(() => {
     // Set a flag in sessionStorage to indicate we're on the sign-in page
     // This helps prevent unwanted redirects in middleware and other components
     sessionStorage.setItem("onSignInPage", "true");
     
-    // No longer automatically clearing session cookies - this causes race conditions
-    // The auth context handles session synchronization properly now
+    // Explicitly verify session once on sign-in page load
+    // This ensures auth context and session state are synchronized
+    const verifyAuthSession = async () => {
+      try {
+        await user?.getIdToken(true); // Force token refresh if user exists
+      } catch (error) {
+        console.error("Error refreshing token:", error);
+      } finally {
+        // Allow the form to be shown after a short delay
+        setTimeout(() => {
+          setCheckingSession(false);
+        }, 500);
+      }
+    };
+    
+    verifyAuthSession();
     
     return () => {
       // Clean up when component unmounts
       sessionStorage.removeItem("onSignInPage");
     };
-  }, []);
+  }, [user]);
 
   // Check for redirect URL or success messages
   useEffect(() => {
