@@ -5,7 +5,7 @@ import { getAuth } from "firebase/auth";
 
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyCjxaxK8WcMcuCBSw-A4tRzvQ7QkE6m36w",
   authDomain: "ageno-quiz-af3ff.firebaseapp.com",
   projectId: "ageno-quiz-af3ff",

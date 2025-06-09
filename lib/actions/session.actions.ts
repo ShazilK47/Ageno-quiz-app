@@ -16,7 +16,6 @@ export const createSession = async (user: User): Promise<SessionResult> => {
     let idToken;
     try {
       idToken = await user.getIdToken(true); // Force refresh to ensure token is fresh
-      console.log("ID token successfully generated");
     } catch (tokenError: any) {
       console.error("Failed to get ID token:", tokenError);
       return {
@@ -32,11 +31,12 @@ export const createSession = async (user: User): Promise<SessionResult> => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Cache-Control": "no-cache, no-store, must-revalidate",
         },
         body: JSON.stringify({ idToken }),
       });
 
-      // Get the response data regardless of status
+      // Parse response data regardless of status
       let data;
       try {
         data = await response.json();
@@ -79,22 +79,13 @@ export const createSession = async (user: User): Promise<SessionResult> => {
 // Clear session cookie from the server
 export const clearSession = async (forceLogout = false): Promise<SessionResult> => {
   try {
-    // Add safety mechanism to prevent accidental session deletion
-    if (!forceLogout) {
-      // Check if session is being cleared during normal application use
-      const isUserInitiated = sessionStorage.getItem('user_initiated_logout') === 'true';
-      
-      if (!isUserInitiated) {
-        console.warn("Prevented automatic session deletion. Use forceLogout=true for forced logouts.");
-        return {
-          success: false,
-          error: "Automatic session deletion prevented for user safety",
-        };
-      }
+    // Set flag to indicate user initiated logout
+    if (typeof window !== 'undefined' && forceLogout) {
+      sessionStorage.setItem('user_initiated_logout', 'true');
     }
     
     const headers: HeadersInit = {
-      'Cache-Control': 'no-cache, no-store, must-revalidate', // Prevent caching
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
     };
     
     // Add force logout header when explicitly requested
@@ -147,70 +138,94 @@ export const checkSession = async (): Promise<{
   reason?: string;
 }> => {
   try {
-    console.log("Sending request to check session");
-    
-    // Add a timeout to prevent hanging with better error handling
+    // Add a timeout to prevent hanging requests
     const controller = new AbortController();
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
-        controller.abort();
-        reject(new Error('Session check request timed out after 3 seconds'));
-      }, 3000);
-    });
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-    // Race between fetch and timeout
-    const fetchPromise = fetch("/api/auth/session/check", {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-        "Pragma": "no-cache"
-      },
-      credentials: "include", // Include cookies
-      signal: controller.signal,
-    });
-    
-    const response = await Promise.race([fetchPromise, timeoutPromise]);
-
-    // Try to parse the response regardless of status
-    let data;
     try {
-      data = await response.json();
-      console.log("Session check response data:", data);
-    } catch (parseError) {
-      console.error("Failed to parse session check response:", parseError);
-      return {
-        isAuthenticated: false,
-        error: "Failed to parse server response",
-        reason: "parse_error",
-      };
-    }
+      const response = await fetch("/api/auth/session/check", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+        },
+        credentials: "include", // Include cookies
+        signal: controller.signal,
+      });
 
-    if (!response.ok) {
-      if (response.status === 401) {
+      clearTimeout(timeoutId);
+
+      // Parse the response regardless of status
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.error("Failed to parse session check response:", parseError);
         return {
           isAuthenticated: false,
-          reason: data.reason || "unauthorized",
+          error: "Failed to parse server response",
+          reason: "parse_error",
+        };
+      }
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Handle specific revocation cases
+          if (data.reason === 'token_revoked') {
+            console.warn('Session token has been revoked. Clearing local session data.');
+            
+            // If we have sessionStorage access, mark this as a revocation for UX handling
+            if (typeof window !== 'undefined') {
+              try {
+                sessionStorage.setItem('token_revoked', 'true');
+              } catch (e) {
+                // Ignore storage errors
+              }
+            }
+          }
+          
+          return {
+            isAuthenticated: false,
+            reason: data.reason || "unauthorized",
+          };
+        }
+
+        return {
+          isAuthenticated: false,
+          error: data.error || `Session check failed (${response.status})`,
+          reason: data.reason,
         };
       }
 
       return {
+        isAuthenticated: data.isAuthenticated,
+        user: data.user,
+      };
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      
+      if (fetchError.name === 'AbortError') {
+        console.error("Session check request timed out");
+        return {
+          isAuthenticated: false,
+          error: "Session check request timed out",
+          reason: "timeout",
+        };
+      }
+      
+      console.error("Network error checking session:", fetchError);
+      return {
         isAuthenticated: false,
-        error: data.error || `Session check failed (${response.status})`,
-        reason: data.reason,
+        error: fetchError.message || "Network error checking session",
+        reason: "network_error",
       };
     }
-
-    return {
-      isAuthenticated: data.isAuthenticated,
-      user: data.user,
-    };
   } catch (error: any) {
-    console.error("Network error checking session:", error);
+    console.error("Error during session check:", error);
     return {
       isAuthenticated: false,
-      error: error.message || "Network error checking session",
-      reason: error.name === 'AbortError' ? "timeout" : "network_error",
+      error: error.message || "Error during session check",
+      reason: "unknown_error",
     };
   }
 };
@@ -222,7 +237,6 @@ export const refreshSession = async (user: User): Promise<SessionResult> => {
     let idToken;
     try {
       idToken = await user.getIdToken(true);
-      console.log("ID token successfully refreshed");
     } catch (tokenError: any) {
       console.error("Failed to refresh ID token:", tokenError);
       return {
@@ -238,6 +252,7 @@ export const refreshSession = async (user: User): Promise<SessionResult> => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Cache-Control": "no-cache, no-store, must-revalidate",
         },
         body: JSON.stringify({ idToken }),
       });

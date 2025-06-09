@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Extended list of public paths to fix 404/401 errors
+// Define public paths that don't require authentication
 const PUBLIC_PATHS = [
   "/",
   "/sign-in",
@@ -8,60 +8,74 @@ const PUBLIC_PATHS = [
   "/reset-password",
   "/verify-email",
   "/api/auth/session",
+  "/api/auth/session/check",
   "/quiz/join",
-  "/join", // Explicitly add join path
-  "/leaderboard", // Make leaderboard publicly accessible 
+  "/join",
+  "/leaderboard",
 ];
 
-// Quiz related patterns that need special handling
-const QUIZ_CODE_PATTERN = /^\/[A-Za-z0-9]{6,}$/; // Matches /{code} where code is 6+ alphanumeric chars
+// Static assets patterns to bypass middleware
+const STATIC_FILE_PATTERNS = [
+  /^\/_next\//,
+  /^\/favicon\.ico$/,
+  /^\/robots\.txt$/,
+  /^\/manifest\.json$/,
+  /^\/sitemap\.xml$/,
+  /\.(svg|png|jpg|jpeg|gif|webp|ico|ttf|woff|woff2|eot|otf|css|js|json|map)$/,
+];
 
-// More robust path checking with wildcard support
-const pathStartsWith = (path: string, prefixes: string[]): boolean => {
-  // Normalize path for consistent comparison
-  const normalizedPath = path.toLowerCase();
+// Function to check if a path is public
+const isPublicPath = (pathname: string): boolean => {
+  // Check against exact matches in PUBLIC_PATHS
+  if (PUBLIC_PATHS.includes(pathname)) {
+    return true;
+  }
   
-  return prefixes.some((prefix) => {
-    // Handle exact matches
-    if (prefix === path) return true;
-    
-    // Handle prefix with wildcard matches
-    if (prefix.endsWith('*')) {
-      const cleanPrefix = prefix.slice(0, -1);
-      return normalizedPath.startsWith(cleanPrefix);
-    }
-    
-    // Handle standard prefix matches
-    return normalizedPath.startsWith(prefix.toLowerCase());
-  });
-};
-
-export async function middleware(request: NextRequest) {
-  // Add request debugging for production troubleshooting
-  const session = request.cookies.get("session")?.value;
-  const userRole = request.cookies.get("user_role")?.value;
-  const pathname = request.nextUrl.pathname;
-
-  // Enhanced public path check with improved quiz code pattern matching
-  const isPublicPath = 
-    PUBLIC_PATHS.includes(pathname) ||
+  // Check against static file patterns
+  if (STATIC_FILE_PATTERNS.some(pattern => pattern.test(pathname))) {
+    return true;
+  }
+  
+  // Check path prefixes
+  if (
     pathname.startsWith("/api/auth/session") ||
     pathname.startsWith("/api/auth/user/public") ||
     pathname.startsWith("/join") ||
     pathname.startsWith("/quiz/join") ||
     pathname.startsWith("/leaderboard") ||
-    QUIZ_CODE_PATTERN.test(pathname) || // Match quiz code URLs like /ABC123
-    // Add static assets paths to avoid auth checks
     pathname.startsWith("/_next") ||
-    pathname.startsWith("/favicon") ||
-    pathname.endsWith(".svg") ||
-    pathname.endsWith(".png") ||
-    pathname.endsWith(".jpg") ||
-    pathname.endsWith(".jpeg") ||
-    pathname.endsWith(".ico");
+    pathname.startsWith("/(dev)") || // Allow access to development routes
+    pathname.includes("/auth-test") || // Explicitly allow access to auth-test page
+    pathname.includes("/useauth-test") // Explicitly allow access to useauth-test page
+  ) {
+    return true;
+  }
+  
+  // Check for valid quiz code pattern (6+ alphanumeric characters)
+  const QUIZ_CODE_PATTERN = /^\/[A-Za-z0-9]{6,}$/;
+  if (QUIZ_CODE_PATTERN.test(pathname)) {
+    return true;
+  }
+  
+  return false;
+};
 
-  // 1. Allow access to public paths without auth
-  if (isPublicPath) {
+// Check if a path is an admin path
+const isAdminPath = (pathname: string): boolean => {
+  return (
+    pathname.startsWith("/admin") ||
+    pathname.includes("/admin/") ||
+    pathname.startsWith("/(admin)")
+  );
+};
+
+export async function middleware(request: NextRequest) {
+  const session = request.cookies.get("session")?.value;
+  const userRole = request.cookies.get("user_role")?.value;
+  const pathname = request.nextUrl.pathname;
+
+  // 1. Allow access to public paths without authentication
+  if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 
@@ -69,25 +83,17 @@ export async function middleware(request: NextRequest) {
   if (!session) {
     // For API routes, return 401 instead of redirect
     if (pathname.startsWith("/api/")) {
-      // Only return 401 for API routes that aren't already marked as public
-      if (!pathname.startsWith("/api/auth/session") && 
-          !pathname.startsWith("/api/auth/user/public")) {
-        return NextResponse.json(
-          { error: "Authentication required" },
-          { status: 401 }
-        );
-      }
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
     }
+    
     return redirectToSignIn(request);
   }
 
-  // 3. Enhanced admin route protection
-  const isAdminRoute = 
-    pathname.startsWith("/admin") || 
-    pathStartsWith(pathname, ["/(admin)"]) ||
-    pathname.includes("/admin/");
-
-  if (isAdminRoute && userRole !== "admin") {
+  // 3. Check admin access
+  if (isAdminPath(pathname) && userRole !== "admin") {
     // For API routes, return 403 instead of redirect
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(
@@ -95,6 +101,7 @@ export async function middleware(request: NextRequest) {
         { status: 403 }
       );
     }
+    
     // Redirect non-admin users to home
     return NextResponse.redirect(new URL("/", request.url));
   }
@@ -104,8 +111,7 @@ export async function middleware(request: NextRequest) {
 }
 
 /**
- * Enhanced redirectToSignIn function that properly encodes redirect parameters
- * and preserves query parameters in complex URLs
+ * Redirect to sign-in page with the current URL as redirect target
  */
 function redirectToSignIn(request: NextRequest) {
   const url = request.nextUrl.clone();
@@ -126,22 +132,14 @@ function redirectToSignIn(request: NextRequest) {
 }
 
 /**
- * Configure paths that require middleware with improved pattern matching
- * This ensures that static assets are never processed by middleware
+ * Configure paths that require middleware
  */
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones we want to exclude
-     * 1. Public assets in /_next/static, /static/, and similar
-     * 2. Next.js system files like /favicon.ico, /robots.txt, etc.
-     * 3. Static files with known extensions (.svg, .jpg, etc.)
-     * 4. Public files we know should always be publicly accessible
-     */
-    "/((?!_next/static|_next/image|_static|_vercel|favicon.ico|robots.txt|manifest.json|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|ttf|woff|woff2|eot|otf|css|js|json|map)).*)",
+    // Match all request paths except for static assets
+    "/((?!_next/static|_next/image|favicon.ico).*)",
     
-    // Explicitly include API routes that need authentication
-    // We can't use negative lookahead (?!) in Next.js middleware matchers
+    // Also explicitly include API routes
     "/api/:path*"
   ],
 };

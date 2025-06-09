@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 import { auth, db } from "@/firebase/admin";
 import { cookies } from "next/headers";
 
-// Set cache control headers to prevent caching of session responses
+// Cache control headers to prevent caching of session responses
 const CACHE_HEADERS = {
   "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
   "Pragma": "no-cache",
@@ -10,49 +11,37 @@ const CACHE_HEADERS = {
   "Surrogate-Control": "no-store" 
 };
 
+// Define interface for enhanced user with additional properties
+interface EnhancedUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  emailVerified: boolean;
+  photoURL: string | null;
+  role: string;
+  lastLoginAt?: unknown;
+  createdAt?: unknown;
+}
+
 export async function GET() {
   try {
-    const cookiesStore = await cookies();
-    const sessionCookie = cookiesStore.get("session")?.value;
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("session")?.value;
 
-    // Reduce excessive logging in production
-    if (process.env.NODE_ENV !== "development") {
-      console.log(
-        "Session check requested:", 
-        sessionCookie ? "cookie exists" : "no cookie"
-      );
-    }
-
-    // Helper function to clear cookies and return unauthorized response
+    // Helper function to create a response with cleared cookies
     const createClearedCookieResponse = (reason = "no_cookie") => {
       const response = NextResponse.json(
-        { 
-          isAuthenticated: false, 
-          reason,
-          timestamp: new Date().toISOString() // Add timestamp to help with debugging
-        },
+        { isAuthenticated: false, reason },
         { status: 401, headers: CACHE_HEADERS }
       );
 
-      // Clear all authentication cookies
-      response.cookies.set({
-        name: "session",
-        value: "",
+      // Clear all auth cookies
+      response.cookies.set("session", "", {
         maxAge: 0,
         path: "/",
       });
 
-      response.cookies.set({
-        name: "user_role",
-        value: "",
-        maxAge: 0,
-        path: "/",
-      });
-
-      // Also clear any legacy cookies that might exist
-      response.cookies.set({
-        name: "auth_token",
-        value: "",
+      response.cookies.set("user_role", "", {
         maxAge: 0,
         path: "/",
       });
@@ -60,112 +49,105 @@ export async function GET() {
       return response;
     };
 
-    // No session cookie found
+    // If no session cookie, return unauthenticated response
     if (!sessionCookie) {
       return createClearedCookieResponse();
-    }
-
-    // Verify the session cookie with better error handling
-    try {
+    }    try {
+      // First try to verify without checking revocation
       let decodedClaims;
       try {
-        // Use the correct parameter format for Firebase Admin SDK
-        decodedClaims = await auth.verifySessionCookie(sessionCookie, true);
-      } catch (cookieError) {
-        console.error("Session cookie verification failed:", cookieError);
+        // First step: verify session without checking revocation
+        decodedClaims = await auth.verifySessionCookie(sessionCookie);
         
-        // More specific error handling based on error code
-        const errorMessage = (cookieError as Error).message || 'Unknown error';
-        const reason = 
-          errorMessage.includes('expired') ? 'session_expired' : 
-          errorMessage.includes('revoked') ? 'session_revoked' : 
-          'invalid_cookie';
-        
-        return createClearedCookieResponse(reason);
+        // If that succeeded, try to verify with revocation check
+        try {
+          await auth.verifySessionCookie(sessionCookie, true);        } catch (revocationError: any) {
+          // Session is valid but revoked, clear it
+          console.log("Token revoked but valid format: clearing session", revocationError?.code || 'unknown_code');
+          return createClearedCookieResponse("token_revoked");
+        }
+      } catch (basicVerifyError) {
+        // Session is completely invalid (not just revoked)
+        console.error("Invalid session token format:", basicVerifyError);
+        return createClearedCookieResponse("invalid_token");
       }
-
-      // Verify user still exists in Firebase Auth
-      try {
-        await auth.getUser(decodedClaims.uid);
-      } catch (userError) {
-        console.error("User doesn't exist in Firebase Auth:", userError);
-        return createClearedCookieResponse("user_not_found");
-      }
-
+      
       const uid = decodedClaims.uid;
       
-      // Try to get user data from Firestore for a more complete profile
-      let userData = null;
-      try {
-        const userDoc = await db.collection("users").doc(uid).get();
-        if (userDoc.exists) {
-          userData = userDoc.data();
-          
-          // Update last active timestamp in Firestore
-          // Use a non-blocking approach with catch to not delay response
-          db.collection("users").doc(uid).update({
-            lastActive: new Date().toISOString(),
-          }).catch(err => {
-            console.warn("Failed to update last active timestamp:", err);
-          });
-        } else {
-          console.warn(`User document not found for uid: ${uid}`);
-        }
-      } catch (firestoreError) {
-        console.warn("Could not fetch user data from Firestore:", firestoreError);
-        // Continue with session data only
-      }
-
-      // Get role from different sources in priority order
-      const userRole =
-        (userData && userData.role) || decodedClaims.role || "user";
-
-      // Return combined user data with debug information to help troubleshooting
+      // Initialize response with basic data from decoded claims
       const responseData = {
         isAuthenticated: true,
         user: {
           uid,
-          email: decodedClaims.email || (userData ? userData.email : null),
-          displayName:
-            decodedClaims.name || (userData ? userData.displayName : null),
-          role: userRole,
-          emailVerified:
-            decodedClaims.email_verified ||
-            (userData ? userData.emailVerified : false),
-          photoURL:
-            decodedClaims.picture || (userData ? userData.photoURL : null),
-          lastLoginAt:
-            userData && userData.lastLoginAt ? userData.lastLoginAt : null,
-          createdAt: userData && userData.createdAt ? userData.createdAt : null,
-        },
-        debug: {
-          timestamp: new Date().toISOString(),
-          sessionSource: userData ? 'firestore+claims' : 'claims-only',
-        }
+          email: decodedClaims.email || null,
+          displayName: decodedClaims.name || null,
+          emailVerified: decodedClaims.email_verified || false,
+          photoURL: decodedClaims.picture || null,
+          role: decodedClaims.role || "user",
+        } as EnhancedUser
       };
       
-      console.log(`Session verified successfully for user: ${uid}`);
+      // Try to get additional user data from Firestore with a timeout
+      try {
+        // Create a timeout that rejects after 500ms
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Firestore timeout')), 500);
+        });
+        
+        // Fetch user data
+        const userDocPromise = db.collection("users").doc(uid).get();
+        
+        // Race between the Firestore query and the timeout
+        const userDoc = await Promise.race([
+          userDocPromise, 
+          timeoutPromise
+        ]) as any;
+        
+        if (userDoc && userDoc.exists) {
+          const userData = userDoc.data() || {};
+          
+          // Only override with Firestore data if it exists
+          if (userData) {
+            // Update basic fields if they exist in Firestore
+            if (userData.role) responseData.user.role = userData.role;
+            if (userData.displayName) responseData.user.displayName = userData.displayName;
+            if (userData.emailVerified !== undefined) responseData.user.emailVerified = userData.emailVerified;
+            if (userData.photoURL) responseData.user.photoURL = userData.photoURL;
+            
+            // Add additional fields that only exist in Firestore
+            responseData.user.lastLoginAt = userData.lastLoginAt || null;
+            responseData.user.createdAt = userData.createdAt || null;
+          }
+        }
+      } catch (firestoreError) {
+        // Non-critical error, continue with just the claims data
+        console.warn("Could not enhance session data with Firestore:", firestoreError);
+      }
       
-      const response = NextResponse.json(responseData);
+      // Return the authenticated response with cache headers
+      const response = NextResponse.json(responseData, { status: 200 });
       
-      // Add cache control headers to prevent caching
-      response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-      response.headers.set('Pragma', 'no-cache');
+      // Set cache control headers to prevent caching
+      Object.entries(CACHE_HEADERS).forEach(([key, value]) => {
+        response.headers.set(key, value);
+      });
       
       return response;
     } catch (verifyError) {
       console.error("Session verification error:", verifyError);
+      // Session is invalid or revoked, clear it
       return createClearedCookieResponse("verification_error");
     }
   } catch (error) {
     console.error("Session check error:", error);
+    // General error handling
     return NextResponse.json(
       {
         isAuthenticated: false,
         error: "Session check failed",
         message: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500, headers: CACHE_HEADERS }
     );
   }
 }

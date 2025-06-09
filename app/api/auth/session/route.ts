@@ -14,41 +14,28 @@ export async function POST(request: NextRequest) {
     if (!idToken) {
       return NextResponse.json({ error: "Missing ID token" }, { status: 400 });
     }
+    
     try {
-      // Verify the ID token first with additional logging
+      // 1. Verify the ID token
       let decodedToken;
       try {
-        // Using the correct parameter format for Firebase Admin SDK
         decodedToken = await auth.verifyIdToken(idToken, true);
-        console.log("Token verified successfully for user:", decodedToken.uid);
       } catch (verifyError: any) {
         console.error("Token verification failed:", verifyError);
-
-        // Return detailed error message for debugging
-        const errorMessage =
-          verifyError instanceof Error
-            ? verifyError.message
-            : "Unknown verification error";
-
-        const errorCode = verifyError.code || "unknown_error";
-
-        console.error(
-          `Token verification error (${errorCode}): ${errorMessage}`
-        );
-
+        
         return NextResponse.json(
           {
             error: "Invalid ID token",
-            message: errorMessage,
-            code: errorCode,
+            message: verifyError instanceof Error ? verifyError.message : "Unknown error",
+            code: verifyError.code || "unknown_error",
           },
           { status: 401 }
         );
       }
 
       const uid = decodedToken.uid;
-
-      // Get or create user document with enhanced fields
+      
+      // 2. Get or update user document
       let userRole = "user";
       try {
         const userDoc = await db.collection("users").doc(uid).get();
@@ -58,14 +45,16 @@ export async function POST(request: NextRequest) {
           const userData = userDoc.data();
           userRole = userData?.role || "user";
 
-          await db.collection("users").doc(uid).update({
+          // Update in a non-blocking way to improve performance
+          db.collection("users").doc(uid).update({
             lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }).catch(error => {
+            console.warn("Non-critical error updating user document:", error);
           });
         } else {
           // Create new user document with all required fields
-          await db
-            .collection("users")
+          db.collection("users")
             .doc(uid)
             .set({
               email: decodedToken.email || "",
@@ -80,17 +69,17 @@ export async function POST(request: NextRequest) {
               customClaims: {
                 role: "user",
               },
+            })
+            .catch(error => {
+              console.warn("Non-critical error creating user document:", error);
             });
         }
       } catch (firestoreError) {
-        console.warn(
-          "Could not update Firestore user document:",
-          firestoreError
-        );
+        console.warn("Could not access Firestore for user document:", firestoreError);
         // Continue with session creation even if Firestore update fails
       }
 
-      // Ensure custom claims are set correctly
+      // 3. Ensure custom claims are set correctly (non-blocking)
       try {
         // Get current custom claims
         const userRecord = await auth.getUser(uid);
@@ -98,70 +87,31 @@ export async function POST(request: NextRequest) {
 
         // Only update claims if role is missing or different
         if (existingClaims.role !== userRole) {
-          await auth.setCustomUserClaims(uid, {
+          auth.setCustomUserClaims(uid, {
             ...existingClaims,
             role: userRole,
+          }).catch(error => {
+            console.warn("Non-critical error updating custom claims:", error);
           });
-          console.log(
-            `Updated custom claims for user ${uid} with role: ${userRole}`
-          );
         }
       } catch (claimsError) {
-        console.warn("Could not update custom claims:", claimsError);
+        console.warn("Could not verify custom claims:", claimsError);
       }
 
-      // Create a session cookie with additional logging and deduplication
+      // 4. Create a session cookie
       let sessionCookie;
       try {
-        // Check if there's already a valid session for this user
-        const existingSessionCookie = request.cookies.get("session")?.value;
-        let createNewSession = true;
-        
-        if (existingSessionCookie) {
-          try {
-            // Verify if there's a valid session already
-            const decodedSession = await auth.verifySessionCookie(
-              existingSessionCookie,
-              true // checkRevoked
-            );
-            
-            // If the existing session is for the same user, skip creating a new one
-            if (decodedSession && decodedSession.uid === uid) {
-              console.log("Valid session already exists for user:", uid);
-              sessionCookie = existingSessionCookie;
-              createNewSession = false;
-            }
-          } catch {
-            // Existing session is invalid or revoked, continue to create a new one
-            console.log("Existing session invalid, creating new session");
-          }
-        }
-
-        if (createNewSession) {
-          sessionCookie = await auth.createSessionCookie(idToken, {
-            expiresIn: SESSION_EXPIRATION_TIME * 1000, // Firebase Auth uses milliseconds
-          });
-          console.log("Session cookie created successfully for user:", uid);
-        }
-        
+        sessionCookie = await auth.createSessionCookie(idToken, {
+          expiresIn: SESSION_EXPIRATION_TIME * 1000, // Firebase Auth uses milliseconds
+        });
       } catch (cookieError: any) {
         console.error("Failed to create session cookie:", cookieError);
-
-        // Return detailed error message for debugging
-        const errorMessage =
-          cookieError instanceof Error
-            ? cookieError.message
-            : "Unknown cookie creation error";
-
-        const errorCode = cookieError.code || "unknown_error";
-
-        console.error(`Session cookie error (${errorCode}): ${errorMessage}`);
 
         return NextResponse.json(
           {
             error: "Failed to create session cookie",
-            message: errorMessage,
-            code: errorCode,
+            message: cookieError instanceof Error ? cookieError.message : "Unknown error",
+            code: cookieError.code || "unknown_error",
           },
           { status: 401 }
         );
@@ -169,25 +119,16 @@ export async function POST(request: NextRequest) {
 
       const cookiesStore = await cookies();
 
-      // Set session cookie for authentication
-      // Make sure sessionCookie is not undefined before setting it
-      if (sessionCookie) {
-        cookiesStore.set({
-          name: "session",
-          value: sessionCookie,
-          maxAge: SESSION_EXPIRATION_TIME,
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production", // Secure in production
-          path: "/",
-          sameSite: "lax", // Changed from strict to lax for better compatibility
-        });
-      } else {
-        console.error("Cannot set session cookie: value is undefined");
-        return NextResponse.json(
-          { error: "Failed to create session cookie - value is undefined" }, 
-          { status: 500 }
-        );
-      }
+      // 5. Set session cookie for authentication with improved security
+      cookiesStore.set({
+        name: "session",
+        value: sessionCookie,
+        maxAge: SESSION_EXPIRATION_TIME,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production", 
+        path: "/",
+        sameSite: "lax", // "lax" allows the cookie to be sent with top-level navigations
+      });
 
       // Set user role cookie for authorization in middleware
       cookiesStore.set({
@@ -197,7 +138,7 @@ export async function POST(request: NextRequest) {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         path: "/",
-        sameSite: "lax", // Changed from strict to lax for better compatibility
+        sameSite: "lax",
       });
 
       return NextResponse.json(
@@ -213,10 +154,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error: "Session processing error",
-          message:
-            sessionError instanceof Error
-              ? sessionError.message
-              : "Unknown error",
+          message: sessionError instanceof Error ? sessionError.message : "Unknown error",
           code: sessionError.code || "unknown_error",
         },
         { status: 401 }
@@ -237,27 +175,10 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    // Add protection against accidental or automated logout requests
-    // Check for special header that indicates this is a deliberate logout
-    const isForceLogout = request.headers.get('X-Force-Logout') === 'true';
-    
-    // Get the referer to check where the request is coming from
+    // Get the referer for logging purposes
     const referer = request.headers.get('referer') || 'unknown';
     console.log(`Session deletion requested from: ${referer}`);
 
-    // If this is not a force logout and it came from HMR or unexpected source, block it
-    if (!isForceLogout && (
-      referer.includes('_next/static') || 
-      referer.includes('webpack') || 
-      referer === 'unknown'
-    )) {
-      console.warn("Blocked potentially accidental session deletion from:", referer);
-      return NextResponse.json({ 
-        success: false,
-        error: "Session deletion blocked - not recognized as intentional logout" 
-      }, { status: 400 });
-    }
-    
     const cookiesStore = await cookies();
 
     // Clear session cookie
@@ -275,6 +196,19 @@ export async function DELETE(request: NextRequest) {
       maxAge: 0,
       path: "/",
     });
+
+    // Also revoke all Firebase sessions if we have a session cookie
+    // This ensures user is logged out across all devices
+    try {
+      const sessionCookie = request.cookies.get("session")?.value;
+      if (sessionCookie) {
+        const decodedClaims = await auth.verifySessionCookie(sessionCookie);
+        await auth.revokeRefreshTokens(decodedClaims.sub);
+      }
+    } catch (error) {
+      // Non-critical error, still consider logout successful
+      console.warn("Could not revoke refresh tokens:", error);
+    }
 
     console.log("Session deleted successfully");
     return NextResponse.json({ success: true }, { status: 200 });
