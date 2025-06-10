@@ -91,7 +91,7 @@ export async function GET() {
       try {
         // Create a timeout that rejects after 4000ms
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Firestore timeout')), 4000);
+          setTimeout(() => reject(new Error('Firestore timeout')), 5000);
         });
         
         // Fetch user data
