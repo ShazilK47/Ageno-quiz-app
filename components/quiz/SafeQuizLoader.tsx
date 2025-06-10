@@ -36,7 +36,6 @@ export default function SafeQuizLoader({ children }: SafeQuizLoaderProps) {
 
   return (
     <AuthStateHandler 
-      bypassOnMobile={true} 
       maxWaitTime={isMobileBrowser ? 800 : 1500}
       skipAuthCheck={isMobileBrowser}
       fallback={
