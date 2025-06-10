@@ -1,180 +1,132 @@
-# 🚀 AgenoQuiz – Secure Quiz & Exam Platform by Agenoverse
+# Ageno Quiz App
 
-Examverse is a modern web-based exam and quiz platform focused on **security**, **monitoring**, and **scalability**. Developed by **Team Agenoverse**, it allows educators to create quizzes, monitor students via webcam/microphone, and securely evaluate responses — all in real time.
+## Overview
 
----
+Ageno Quiz App is a comprehensive assessment platform built with Next.js and Firebase, designed to streamline the creation, management, and analysis of educational quizzes. The application offers robust features for administrators and an intuitive interface for users taking assessments.
 
-## 🔧 Tech Stack
+## Features
 
-- **Frontend**: Next.js + TypeScript
+### For Quiz Administrators
+- **Quiz Creation and Management**
+  - Create custom quizzes with various question types
+  - Upload images for rich multimedia questions
+  - Edit existing quizzes with question reordering and duplication
+  - Import/export functionality for quiz questions
+
+- **User Management**
+  - Complete user administration dashboard
+  - Role-based access control
+  - Sorting and filtering capabilities
+
+- **Advanced Analytics**
+  - Detailed performance metrics and statistics
+  - Visual data representations with interactive charts
+  - Score and time distribution analysis
+  - CSV export for extended data analysis
+
+### For Quiz Participants
+- **Seamless Quiz Experience**
+  - Easy quiz access through unique codes
+  - Clean, distraction-free quiz interface
+  - Real-time progress tracking
+  - Immediate feedback on quiz completion
+
+- **User Features**
+  - Personal profile management
+  - Quiz history and performance tracking
+  - Leaderboard access
+
+## Technology Stack
+
+- **Frontend**: Next.js 15, React 19, TypeScript
 - **Styling**: Tailwind CSS
-- **Database**: Firebase Firestore
-- **Auth**: Firebase Authentication with SWR
-- **Media Access**: WebRTC/MediaDevices API
-- **Hosting**: Vercel
+- **Authentication**: Firebase Authentication
+- **Database**: Firestore
+- **Visualization**: Chart.js, React-ChartJS-2
+- **Animation**: Framer Motion
+- **Testing**: Vitest
 
----
+## Getting Started
 
-## 🎯 Features
+### Prerequisites
 
-- ✅ Create and manage multiple quizzes
-- ✅ Add MCQs with options and optional timers
-- ✅ User authentication (admin/student)
-- ✅ SWR-based auth hook with caching and revalidation
-- ✅ Enhanced error handling for auth operations
-- ✅ Multi-factor authentication support
-- ✅ Enter quiz via access code
-- ✅ Real-time camera and mic access
-- ✅ Automatic answer checking and scoring
-- ✅ Show results when admin allows
-- ✅ Admin-only quiz and user management dashboard
-- ✅ Firebase-based data storage and security
+- Node.js (v18 or newer)
+- npm or yarn
+- Firebase account
 
----
+### Installation
 
-## 📂 Folder Structure
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/ageno-quiz-app.git
+   cd ageno-quiz-app
+   ```
 
-````
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-/pages
-/admin ← Admin dashboard, quiz creation
-/quiz ← Join & attempt quiz
-/auth ← Login/Register
+3. Configure environment variables:
+   Create a `.env.local` file in the root directory with your Firebase configuration:
+   ```
+   NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
+   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_auth_domain
+   NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_storage_bucket
+   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+   NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+   ```
 
-/lib
-firebase.ts ← Firebase config
-auth.ts ← Auth functions
-camera.ts ← Media device logic
+4. Start the development server:
+   ```bash
+   npm run dev
+   ```
 
-/types
-quiz.ts ← Quiz & question types
+5. Open [http://localhost:3000](http://localhost:3000) in your browser to view the application.
 
-/components
-Question.tsx, Timer.tsx, QuizCard.tsx
-
----
-
-## 🔐 Enhanced Authentication with useAuth Hook
-
-The application uses a custom `useAuth` hook that enhances authentication with SWR caching:
-
-```typescript
-import { useAuth } from '@/hooks/useAuth';
-
-// In your component
-const { user, loading, isAdmin, login, logout } = useAuth();
-````
-
-### Key Benefits:
-
-- **Optimized Performance**: SWR caching reduces unnecessary API calls
-- **Automatic Session Revalidation**: Session stays fresh with focus/reconnect events
-- **Consistent Error Handling**: Standardized error responses across all auth operations
-- **Type Safety**: Full TypeScript support with detailed interfaces
-- **Enhanced Security**: Improved session management and validation
-
-For detailed documentation, see [useAuth documentation](./docs/useAuth.md).
-
-````
-
----
-
-## 🚀 Getting Started
-
-### 1. Clone the Repo
+### Building for Production
 
 ```bash
-git clone https://github.com/your-username/ageno-quiz.git
-cd ageno-quiz
-````
-
-### 2. Install Dependencies
-
-```bash
-npm install
+npm run build
+npm run start
 ```
 
-### 3. Configure Firebase
+## Project Structure
 
-- Create a Firebase project
-- Enable Firestore and Auth
-- Add your credentials in `/lib/firebase.ts`
-
-```ts
-// lib/firebase.ts
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "...",
-  projectId: "...",
-  storageBucket: "...",
-  messagingSenderId: "...",
-  appId: "...",
-};
+```
+ageno-quiz-app/
+├── app/                  # Next.js app directory with routing
+│   ├── (admin)/          # Admin routes and components
+│   ├── (auth)/           # Authentication routes
+│   ├── (quiz)/           # Quiz taking experience routes
+│   ├── (user)/           # User dashboard routes
+│   └── api/              # API endpoints
+├── components/           # Shared React components
+│   ├── analytics/        # Analytics and visualization components
+│   ├── common/           # Common UI elements
+│   └── quiz/             # Quiz-related components
+├── contexts/             # React contexts
+├── firebase/             # Firebase configuration and utilities
+├── hooks/                # Custom React hooks
+├── lib/                  # Utility functions and services
+└── public/               # Static assets
 ```
 
-### 4. Run the App
+## Features and Functionality
 
-```bash
-npm run dev
-```
+- **Media Management**: Full support for image uploads in quiz questions with preview and deletion
+- **Enhanced Quiz Analytics**: Detailed score and time distribution visualizations
+- **CSV Export**: One-click export of quiz results for further analysis
+- **Improved UI/UX**: Intuitive navigation, consistent styling, and responsive design
+- **Data Visualization**: Interactive charts for quiz performance metrics
 
----
+## License
 
-## 👨‍💻 Team – Agenoverse
+[MIT](LICENSE)
 
-- **Lead Developer (Admin Module)**: \[Your Name]
-- **Frontend Developer (Quiz Flow)**: \[Teammate 2]
-- **Security & Auth (Proctoring/Monitoring)**: \[Teammate 3]
+## Acknowledgments
 
----
-
-## 📦 Deployment
-
-This project can be deployed easily using [Vercel](https://vercel.com).
-
-```bash
-vercel deploy
-```
-
----
-
-## 📜 License
-
-MIT License © 2025 Agenoverse
-
----
-
-## 🔠 Multi-Difficulty Quiz Support
-
-AgenoQuiz features a robust difficulty system that allows quiz creators to:
-
-- Set up multiple difficulty levels (easy, medium, hard)
-- Define custom time limits for each difficulty
-- Assign point multipliers to reward challenging difficulty selection
-- Customize which difficulties are available per quiz
-
-### Key Components:
-
-- **Difficulty Settings UI**: Admin can configure time limits and point multipliers
-- **Difficulty Selection**: Quiz takers can choose their preferred difficulty level
-- **Adaptive Scoring**: Scores are adjusted based on the selected difficulty
-- **Flexible Timing**: Timer automatically adjusts to match the selected difficulty
-
-### Helper Functions:
-
-We provide a set of utility functions in `utils/difficulty-helpers.ts` to handle difficulty-related logic:
-
-```typescript
-// Get duration for a specific difficulty
-const duration = getDifficultyDuration(quiz, "hard"); // Returns duration in minutes
-
-// Apply difficulty multiplier to score
-const finalScore = applyDifficultyMultiplier(rawScore, quiz, "hard");
-
-// Get formatted difficulty info for display
-const info = getDifficultyDisplayInfo(quiz, "medium");
-console.log(info.duration); // "30 minutes"
-console.log(info.multiplier); // "1.5x"
-```
-
-For detailed documentation, see [Difficulty Settings documentation](./docs/DifficultySettings.md) and [Difficulty Helpers documentation](./docs/DifficultyHelpers.md).
+- CodeRiders Development Team
+- Next.js and React teams for the exceptional frameworks
+- Firebase team for the robust backend services
