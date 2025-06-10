@@ -36,7 +36,8 @@ export default function MyQuizzes() {
       setError(null);
 
       console.log("Fetching quiz attempts for user", user.uid);
-      const userAttempts = await getUserQuizAttempts();
+      // Pass the user ID from React context to ensure it works even if Firebase Auth isn't fully initialized
+      const userAttempts = await getUserQuizAttempts(user.uid);
       console.log("Fetched attempts:", userAttempts.length);
       setAttempts(userAttempts);
 
@@ -116,28 +117,28 @@ export default function MyQuizzes() {
           <h3 className="text-lg font-semibold text-gray-600">
             Total Attempts
           </h3>
-          <p className="text-3xl font-bold text-purple-600">
+          <p className="text-2xl font-bold text-purple-600">
             {stats.totalAttempts}
           </p>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-4">
           <h3 className="text-lg font-semibold text-gray-600">Average Score</h3>
-          <p className="text-3xl font-bold text-purple-600">
+          <p className="text-2xl font-bold text-purple-600">
             {stats.averageScore}%
           </p>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-4">
           <h3 className="text-lg font-semibold text-gray-600">Highest Score</h3>
-          <p className="text-3xl font-bold text-purple-600">
+          <p className="text-2xl font-bold text-purple-600">
             {stats.highestScore}%
           </p>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-4">
           <h3 className="text-lg font-semibold text-gray-600">Last Attempt</h3>
-          <p className="text-3xl font-bold text-purple-600">
+          <p className="text-2xl font-bold text-purple-600">
             {stats.mostRecentAttempt
               ? formatDistanceToNow(stats.mostRecentAttempt, {
                   addSuffix: true,

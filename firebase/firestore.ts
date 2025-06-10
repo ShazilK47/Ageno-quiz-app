@@ -819,13 +819,13 @@ export async function submitQuizResponse(
 /**
  * Fetch user's quiz attempts
  */
-export async function getUserQuizAttempts(): Promise<QuizAttempt[]> {
+export async function getUserQuizAttempts(manualUserId?: string): Promise<QuizAttempt[]> {
   try {
     // Log authentication state for debugging
     logAuthState();
 
-    // Get current user ID
-    const userId = auth.currentUser?.uid;
+    // Get current user ID - either from the parameter or from Firebase Auth
+    const userId = manualUserId || auth.currentUser?.uid;
     if (!userId) {
       console.error("Cannot fetch attempts: No authenticated user");
       return [];

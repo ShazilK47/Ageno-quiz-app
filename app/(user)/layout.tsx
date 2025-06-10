@@ -38,8 +38,15 @@ export default function UserLayout({
 
   // Redirect if not authenticated and loading is complete
   useEffect(() => {
+    // Only redirect if we're confident the user is not authenticated
+    // Add a small delay to allow auth state to fully initialize
     if (!loading && !user) {
-      router.push("/sign-in");
+      const redirectTimeout = setTimeout(() => {
+        console.log("UserLayout: User not authenticated, redirecting to sign-in");
+        router.push("/sign-in");
+      }, 500); // Small delay to ensure auth state is stable
+      
+      return () => clearTimeout(redirectTimeout);
     }
   }, [user, loading, router]);
 
