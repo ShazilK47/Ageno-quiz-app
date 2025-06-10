@@ -77,7 +77,7 @@ export default function Header() {
                   Dashboard
                 </span>
               </NavLink>
-              <NavLink href="/my-quizzes">
+              <NavLink href="/quizzes">
                 <span className="flex items-center">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
