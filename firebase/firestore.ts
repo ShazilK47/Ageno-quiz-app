@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // firebase/firestore.ts
 import { db, auth } from "./client";
 import {
@@ -174,9 +175,9 @@ export const quizAttemptConverter = {
 function logAuthState() {
   const user = auth.currentUser;
   if (user) {
-    console.log("User is authenticated:", user.uid);
+    // console.log("User is authenticated:", user.uid);
   } else {
-    console.log("User is not authenticated");
+    // console.log("User is not authenticated");
   }
 }
 
@@ -249,16 +250,16 @@ export async function getQuizById(quizId: string): Promise<Quiz | null> {
         );
         const diffSnapshot = await getDocs(difficultyQuestionsRef);
         difficultyInfo[difficulty] = !diffSnapshot.empty;
-        console.log(
-          `${difficulty} difficulty has ${diffSnapshot.size} questions available`
-        );
+        // console.log(
+        //   `${difficulty} difficulty has ${diffSnapshot.size} questions available`
+        // );
       } catch (error) {
         console.error(`Error checking ${difficulty} questions:`, error);
         difficultyInfo[difficulty] = false;
       }
     }
 
-    console.log("Difficulty availability:", difficultyInfo);
+    // console.log("Difficulty availability:", difficultyInfo);
 
     quiz.questions = questionsSnapshot.docs.map((doc) => {
       const data = doc.data();
@@ -274,9 +275,9 @@ export async function getQuizById(quizId: string): Promise<Quiz | null> {
 
         if (numericKeys.length > 0) {
           options = numericKeys.map((key) => data[key]);
-          console.log(
-            `Found ${options.length} options from numbered properties for question ${doc.id}`
-          );
+          // console.log(
+          //   `Found ${options.length} options from numbered properties for question ${doc.id}`
+          // );
         }
       }
       return {
@@ -347,9 +348,9 @@ export async function getQuizByCode(code: string): Promise<Quiz | null> {
 
         if (numericKeys.length > 0) {
           options = numericKeys.map((key) => data[key]);
-          console.log(
-            `Found ${options.length} options from numbered properties for question ${doc.id}`
-          );
+          // console.log(
+          //   `Found ${options.length} options from numbered properties for question ${doc.id}`
+          // );
         }
       }
       return {
@@ -399,14 +400,14 @@ export async function submitQuizResponse(
 
     // Log authentication state and submission details for debugging
     logAuthState();
-    console.log("Quiz submission - Selected difficulty:", selectedDifficulty);
-    console.log("Quiz submission - Start time:", startTime);
-    console.log("Quiz submission - Tab switches:", tabSwitches);
-    console.log("Quiz submission - User answers count:", userAnswers.length);
+    // console.log("Quiz submission - Selected difficulty:", selectedDifficulty);
+    // console.log("Quiz submission - Start time:", startTime);
+    // console.log("Quiz submission - Tab switches:", tabSwitches);
+    // console.log("Quiz submission - User answers count:", userAnswers.length);
 
     // Get current user ID, or use "anonymous" if not logged in
     const userId = auth.currentUser?.uid || "anonymous";
-    console.log("Quiz submission - User ID:", userId);
+    // console.log("Quiz submission - User ID:", userId);
 
     // Get quiz data to calculate score
     const quiz = await getQuizById(quizId);
@@ -420,9 +421,9 @@ export async function submitQuizResponse(
       (!quiz.questions || quiz.questions.length === 0) &&
       selectedDifficulty
     ) {
-      console.log(
-        `Attempting to load ${selectedDifficulty} difficulty questions for quiz submission`
-      );
+      // console.log(
+      //   `Attempting to load ${selectedDifficulty} difficulty questions for quiz submission`
+      // );
       try {
         const difficultyQuestions = await getQuestionsByDifficulty(
           quizId,
@@ -430,9 +431,9 @@ export async function submitQuizResponse(
         );
 
         if (difficultyQuestions && difficultyQuestions.length > 0) {
-          console.log(
-            `Successfully loaded ${difficultyQuestions.length} questions for ${selectedDifficulty} difficulty`
-          );
+          // console.log(
+          //   `Successfully loaded ${difficultyQuestions.length} questions for ${selectedDifficulty} difficulty`
+          // );
           quiz.questions = difficultyQuestions;
         }
       } catch (error) {
@@ -457,9 +458,9 @@ export async function submitQuizResponse(
 
       // Try to recover the questions from user answers if possible
       if (userAnswers && userAnswers.length > 0) {
-        console.log(
-          "Attempting to reconstruct question structure from user answers"
-        );
+        // console.log(
+        //   "Attempting to reconstruct question structure from user answers"
+        // );
         const reconstructedQuestions = userAnswers.map((answer, index) => ({
           id: answer.questionId,
           text: `Question ${index + 1}`,
@@ -470,7 +471,7 @@ export async function submitQuizResponse(
         }));
 
         if (reconstructedQuestions.length > 0) {
-          console.log("Successfully reconstructed questions from user answers");
+          // console.log("Successfully reconstructed questions from user answers");
           quiz.questions = reconstructedQuestions;
         } else {
           return null;
@@ -480,10 +481,10 @@ export async function submitQuizResponse(
       }
     }
 
-    console.log(
-      "Quiz submission - Total questions:",
-      quiz.questions?.length || 0
-    );
+    // console.log(
+    //   "Quiz submission - Total questions:",
+    //   quiz.questions?.length || 0
+    // );
 
     // Calculate score if auto-check is enabled
     let score = null;
@@ -491,11 +492,11 @@ export async function submitQuizResponse(
       let correctCount = 0;
       let answeredCount = 0;
 
-      console.log(
-        "Checking answers - all user answers:",
-        JSON.stringify(userAnswers)
-      );
-      console.log("Quiz questions:", JSON.stringify(quiz.questions)); // First, let's check if we have valid question IDs in the user answers
+      // console.log(
+      //   "Checking answers - all user answers:",
+      //   JSON.stringify(userAnswers)
+      // );
+      // console.log("Quiz questions:", JSON.stringify(quiz.questions)); // First, let's check if we have valid question IDs in the user answers
       // Sanitize quiz.questions to ensure it's an array
       if (!quiz.questions) {
         quiz.questions = [];
@@ -503,16 +504,16 @@ export async function submitQuizResponse(
       }
 
       const validQuestionIds = new Set(quiz.questions.map((q) => q.id));
-      console.log(
-        `Valid question IDs in quiz: [${Array.from(validQuestionIds).join(
-          ", "
-        )}]`
-      );
+      // console.log(
+      //   `Valid question IDs in quiz: [${Array.from(validQuestionIds).join(
+      //     ", "
+      //   )}]`
+      // );
 
       // Check if questions and user answers have matching IDs
       const userAnswerIds = new Set(userAnswers.map((a) => a.questionId));
 
-      console.log(`User answer IDs: [${Array.from(userAnswerIds).join(", ")}]`);
+      // console.log(`User answer IDs: [${Array.from(userAnswerIds).join(", ")}]`);
 
       // Check for mismatch
       if (validQuestionIds.size === 0 && userAnswerIds.size > 0) {
@@ -527,7 +528,7 @@ export async function submitQuizResponse(
             ...q,
             id: userAnswers[i].questionId,
           }));
-          console.log("Repaired question IDs by mapping to user answers");
+          // console.log("Repaired question IDs by mapping to user answers");
         }
       }
 
@@ -549,21 +550,21 @@ export async function submitQuizResponse(
             (q) => q.id === answer.questionId
           );
 
-          console.log(
-            `Answer ${index}: questionId=${answer.questionId}, selectedIndex=${answer.selectedOptionIndex}, ` +
-              `questionFound=${!!question}, correctIndex=${
-                question?.correctIndex
-              }`
-          );
+          // console.log(
+          //   `Answer ${index}: questionId=${answer.questionId}, selectedIndex=${answer.selectedOptionIndex}, ` +
+          //     `questionFound=${!!question}, correctIndex=${
+          //       question?.correctIndex
+          //     }`
+          // );
 
           if (
             question &&
             answer.selectedOptionIndex === question.correctIndex
           ) {
             correctCount++;
-            console.log(`✅ CORRECT answer for question ${index}`);
+            // console.log(`✅ CORRECT answer for question ${index}`);
           } else {
-            console.log(`❌ WRONG answer for question ${index}`);
+            // console.log(`❌ WRONG answer for question ${index}`);
           }
         }
       });
@@ -592,9 +593,9 @@ export async function submitQuizResponse(
             pointsMultiplier = difficultySettings.pointsMultiplier;
           } else if (defaultMultipliers[selectedDifficulty]) {
             // Use standard defaults if not defined in quiz settings
-            console.log(
-              `Using default multiplier for ${selectedDifficulty} difficulty`
-            );
+            // console.log(
+            //   `Using default multiplier for ${selectedDifficulty} difficulty`
+            // );
             pointsMultiplier = defaultMultipliers[selectedDifficulty];
           }
         }
@@ -607,9 +608,9 @@ export async function submitQuizResponse(
           pointsMultiplier = 1.0;
         }
 
-        console.log(
-          `Using ${selectedDifficulty} difficulty multiplier: ${pointsMultiplier}x`
-        );
+        // console.log(
+        //   `Using ${selectedDifficulty} difficulty multiplier: ${pointsMultiplier}x`
+        // );
       } catch (error) {
         console.error("Error getting difficulty multiplier:", error);
         pointsMultiplier = 1.0; // Fallback to default on any error
@@ -658,9 +659,9 @@ export async function submitQuizResponse(
           // This ensures consistency with the client-side calculation
           rawScore = (correctCount / denominator) * 100;
 
-          console.log(
-            `Using denominator: ${denominator} (answered: ${answeredCount}, total: ${questionsCount})`
-          );
+          // console.log(
+          //   `Using denominator: ${denominator} (answered: ${answeredCount}, total: ${questionsCount})`
+          // );
 
           // Double check for NaN
           if (isNaN(rawScore)) {
@@ -676,9 +677,9 @@ export async function submitQuizResponse(
           console.error("Cannot calculate score: No questions in quiz");
         }
 
-        console.log(
-          `Raw calculation: ${correctCount} correct / ${answeredCount} answered (of ${questionsCount} total) * 100 = ${rawScore}`
-        );
+        // console.log(
+        //   `Raw calculation: ${correctCount} correct / ${answeredCount} answered (of ${questionsCount} total) * 100 = ${rawScore}`
+        // );
 
         // Ensure we have valid numbers before calculation
         if (
@@ -705,9 +706,9 @@ export async function submitQuizResponse(
               score = 0;
             } else {
               score = calculatedScore;
-              console.log(
-                `Final score after multiplier (${pointsMultiplier}x): ${score}`
-              );
+              // console.log(
+              //   `Final score after multiplier (${pointsMultiplier}x): ${score}`
+              // );
             }
           } catch (calcError) {
             console.error("Error in final score calculation:", calcError);
@@ -721,21 +722,21 @@ export async function submitQuizResponse(
           score = 0; // Fallback to 0 if we get NaN or Infinity
         }
       } else {
-        console.log(
-          `No valid questions array found in quiz: questionsLength=${
-            quiz.questions?.length || 0
-          }`
-        );
+        // console.log(
+        //   `No valid questions array found in quiz: questionsLength=${
+        //     quiz.questions?.length || 0
+        //   }`
+        // );
         score = 0; // Set score to 0 if no questions were found
       }
 
       // Log summary of answers
-      console.log(`Score calculation summary:
-        - Total questions in quiz: ${quiz.questions.length}
-        - Questions answered by user: ${answeredCount}
-        - Correct answers: ${correctCount}
-        - Final score: ${score}
-      `);
+      // console.log(`Score calculation summary:
+      //   - Total questions in quiz: ${quiz.questions.length}
+      //   - Questions answered by user: ${answeredCount}
+      //   - Correct answers: ${correctCount}
+      //   - Final score: ${score}
+      // `);
     }
 
     // Create response document
@@ -796,9 +797,9 @@ export async function submitQuizResponse(
       }
     }
 
-    console.log(
-      `Quiz response submitted: ${responseDoc.id} with score ${finalScore}`
-    );
+    // console.log(
+    //   `Quiz response submitted: ${responseDoc.id} with score ${finalScore}`
+    // );
     return {
       responseId: responseDoc.id,
       score: finalScore,
@@ -830,22 +831,22 @@ export async function getUserQuizAttempts(): Promise<QuizAttempt[]> {
       return [];
     }
 
-    console.log("Fetching quiz attempts for user ID:", userId);
+    // console.log("Fetching quiz attempts for user ID:", userId);
 
     // CRITICAL DEBUGGING: Print out a list of all responses regardless of userId
     // to see if there are any responses at all
     try {
       const allResponsesRef = collection(db, "responses");
       const allResponses = await getDocs(allResponsesRef);
-      console.log("DEBUG: Total responses in database:", allResponses.size);
-      console.log(
-        "DEBUG: First few responses:",
-        allResponses.docs.slice(0, 3).map((doc) => ({
-          id: doc.id,
-          userId: doc.data().userId,
-          data: doc.data(),
-        }))
-      );
+      // console.log("DEBUG: Total responses in database:", allResponses.size);
+      // console.log(
+      //   "DEBUG: First few responses:",
+      //   allResponses.docs.slice(0, 3).map((doc) => ({
+      //     id: doc.id,
+      //     userId: doc.data().userId,
+      //     data: doc.data(),
+      //   }))
+      // );
     } catch (err) {
       console.error("Error in debug query:", err);
     }
@@ -859,31 +860,31 @@ export async function getUserQuizAttempts(): Promise<QuizAttempt[]> {
     );
 
     const querySnapshot = await getDocs(q);
-    console.log("Query snapshot size:", querySnapshot.size);
+    // console.log("Query snapshot size:", querySnapshot.size);
 
     if (querySnapshot.size === 0) {
-      console.log(
-        "No attempts found for user. Checking if responses exist with different user ID format"
-      );
+      // console.log(
+      //   "No attempts found for user. Checking if responses exist with different user ID format"
+      // );
 
       // Try a more permissive query to see if the userId might be stored differently
       // For example, some systems might store UIDs as strings vs objects or with different casing
       const looseQuery = query(responsesRef, orderBy("submittedAt", "desc"));
 
       const looseResults = await getDocs(looseQuery);
-      console.log("All responses:", looseResults.size);
-      console.log(
-        "All user IDs in responses:",
-        looseResults.docs.map((doc) => ({
-          userId: doc.data().userId,
-          typeOfUserId: typeof doc.data().userId,
-        }))
-      );
+      // console.log("All responses:", looseResults.size);
+      // console.log(
+      //   "All user IDs in responses:",
+      //   looseResults.docs.map((doc) => ({
+      //     userId: doc.data().userId,
+      //     typeOfUserId: typeof doc.data().userId,
+      //   }))
+      // );
     } else {
-      console.log(
-        "Raw query results:",
-        querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-      );
+      // console.log(
+      //   "Raw query results:",
+      //   querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+      // );
     }
 
     // Convert snapshots to QuizAttempt objects
@@ -898,18 +899,18 @@ export async function getUserQuizAttempts(): Promise<QuizAttempt[]> {
 
         // Get the associated quiz details
         if (attempt.quizId) {
-          console.log(`Fetching quiz details for quizId: ${attempt.quizId}`);
+          // console.log(`Fetching quiz details for quizId: ${attempt.quizId}`);
           const quiz = await getQuizById(attempt.quizId);
           if (quiz) {
             attempt.quizTitle = quiz.title;
             attempt.quizDescription = quiz.description;
-            console.log(`Found quiz: ${quiz.title}`);
+            // console.log(`Found quiz: ${quiz.title}`);
           } else {
-            console.log(`Quiz not found for ID: ${attempt.quizId}`);
+            // console.log(`Quiz not found for ID: ${attempt.quizId}`);
             attempt.quizTitle = "Unknown Quiz"; // Fallback title
           }
         } else {
-          console.log(`No quizId found for attempt ${docSnapshot.id}`);
+          // console.log(`No quizId found for attempt ${docSnapshot.id}`);
           attempt.quizTitle = "Unknown Quiz"; // Fallback title
         }
 
@@ -922,9 +923,9 @@ export async function getUserQuizAttempts(): Promise<QuizAttempt[]> {
             "answers"
           );
           const answersSnapshot = await getDocs(answersRef);
-          console.log(
-            `Found ${answersSnapshot.size} answers for attempt ${docSnapshot.id}`
-          );
+          // console.log(
+          //   `Found ${answersSnapshot.size} answers for attempt ${docSnapshot.id}`
+          // );
 
           attempt.answers = answersSnapshot.docs.map((doc) => {
             const data = doc.data();
@@ -943,14 +944,14 @@ export async function getUserQuizAttempts(): Promise<QuizAttempt[]> {
         }
 
         attempts.push(attempt);
-        console.log(`Successfully added attempt ${docSnapshot.id} to results`);
+        // console.log(`Successfully added attempt ${docSnapshot.id} to results`);
       } catch (err) {
         console.error(`Error processing attempt ${docSnapshot.id}:`, err);
         // Continue to the next attempt instead of failing the whole function
       }
     }
 
-    console.log(`Returning ${attempts.length} attempts`);
+    // console.log(`Returning ${attempts.length} attempts`);
     return attempts;
   } catch (error) {
     console.error("Error fetching user quiz attempts:", error);
@@ -974,9 +975,9 @@ export async function getQuestionsByDifficulty(
   try {
     // Log authentication state for debugging
     logAuthState();
-    console.log(
-      `Fetching ${difficulty} difficulty questions for quiz ${quizId}`
-    );
+    // console.log(
+    //   `Fetching ${difficulty} difficulty questions for quiz ${quizId}`
+    // );
 
     // We could use a server-side cache here in a more complete solution
     // but for now we'll focus on fetching from Firestore directly
@@ -989,9 +990,9 @@ export async function getQuestionsByDifficulty(
     const questionsSnapshot = await getDocs(questionsRef);
 
     if (questionsSnapshot.empty) {
-      console.log(
-        `No ${difficulty} questions found for quiz ${quizId}, trying fallback to main questions`
-      );
+      // console.log(
+      //   `No ${difficulty} questions found for quiz ${quizId}, trying fallback to main questions`
+      // );
 
       // If no difficulty-specific questions found, try to get the main questions collection
       const mainQuestionsRef = collection(db, `quizzes/${quizId}/questions`);
@@ -1025,9 +1026,9 @@ export async function getQuestionsByDifficulty(
         fallbackQuestions.push(question);
       });
 
-      console.log(
-        `Found ${fallbackQuestions.length} questions in the main collection as fallback`
-      );
+      // console.log(
+      //   `Found ${fallbackQuestions.length} questions in the main collection as fallback`
+      // );
       return fallbackQuestions;
     }
 
@@ -1059,9 +1060,9 @@ export async function getQuestionsByDifficulty(
               text: String(questionData[key]),
               isCorrect: Number(key) === questionData.correctIndex,
             }));
-            console.log(
-              `Generated ${options.length} options from numeric keys for question ${doc.id}`
-            );
+            // console.log(
+            //   `Generated ${options.length} options from numeric keys for question ${doc.id}`
+            // );
           } else {
             console.warn(
               `Question ${doc.id} has no options, creating placeholder`
@@ -1134,9 +1135,9 @@ export async function getQuestionsByDifficulty(
       }
     });
 
-    console.log(
-      `Successfully loaded ${questions.length} questions for ${difficulty} difficulty`
-    );
+    // console.log(
+    //   `Successfully loaded ${questions.length} questions for ${difficulty} difficulty`
+    // );
     return questions;
   } catch (error) {
     console.error(

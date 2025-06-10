@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -86,19 +87,19 @@ export default function QuizClient({ code }: ClientProps) {
       score === null &&
       lastCalculatedScoreRef.current !== null
     ) {
-      console.log("Restoring score from ref:", lastCalculatedScoreRef.current);
+      // console.log("Restoring score from ref:", lastCalculatedScoreRef.current);
       setScore(lastCalculatedScoreRef.current);
     }
   }, [quizSubmitted, score]);
 
   // Add effect to log score states for debugging
-  useEffect(() => {
-    if (quizSubmitted) {
-      console.log(
-        `Score state debug - state:${score}, ref:${lastCalculatedScoreRef.current}, calculated:${scoreCalculatedRef.current}`
-      );
-    }
-  }, [quizSubmitted, score]);
+  // useEffect(() => {
+  //   if (quizSubmitted) {
+  //     console.log(
+  //       `Score state debug - state:${score}, ref:${lastCalculatedScoreRef.current}, calculated:${scoreCalculatedRef.current}`
+  //     );
+  //   }
+  // }, [quizSubmitted, score]);
 
   // Remove initialization effect to avoid re-render loops
   // We'll rely solely on handleStartQuiz to initialize the timer
@@ -158,7 +159,7 @@ export default function QuizClient({ code }: ClientProps) {
                 text: String(q[key as keyof typeof q]),
                 isCorrect: Number(key) === q.correctIndex, // Set isCorrect based on correctIndex
               }));
-              console.log("Created options from numeric keys:", newOptions);
+              // console.log("Created options from numeric keys:", newOptions);
               return { ...q, options: newOptions };
             }
             return q;
@@ -183,13 +184,13 @@ export default function QuizClient({ code }: ClientProps) {
   // Check if questions are already loaded when the component mounts
   useEffect(() => {
     // Debug the current state
-    console.log(`[PRELOADED-CHECK] Component state:`, {
-      hasQuestions: quiz?.questions && quiz.questions.length > 0,
-      questionsCount: quiz?.questions?.length || 0,
-      difficultySelected,
-      isLoadingQuestions,
-      selectedDifficulty,
-    });
+    // console.log(`[PRELOADED-CHECK] Component state:`, {
+    //   hasQuestions: quiz?.questions && quiz.questions.length > 0,
+    //   questionsCount: quiz?.questions?.length || 0,
+    //   difficultySelected,
+    //   isLoadingQuestions,
+    //   selectedDifficulty,
+    // });
 
     if (
       quiz?.questions &&
@@ -197,15 +198,15 @@ export default function QuizClient({ code }: ClientProps) {
       !difficultySelected &&
       !isLoadingQuestions
     ) {
-      console.log(
-        `[PRELOADED-CHECK] Questions already loaded in quiz (${
-          quiz?.questions?.length || 0
-        } questions), marking difficulty as selected`
-      );
+      // console.log(
+      //   `[PRELOADED-CHECK] Questions already loaded in quiz (${
+      //     quiz?.questions?.length || 0
+      //   } questions), marking difficulty as selected`
+      // );
       setDifficultySelected(true);
-      console.log(
-        `[PRELOADED-CHECK] Currently selected difficulty: ${selectedDifficulty}`
-      );
+      // console.log(
+      //   `[PRELOADED-CHECK] Currently selected difficulty: ${selectedDifficulty}`
+      // );
 
       // Initialize user answers if not already done
       if (userAnswers.length === 0 && quiz?.questions) {
@@ -214,9 +215,9 @@ export default function QuizClient({ code }: ClientProps) {
           selectedOptionIndex: null,
         }));
         setUserAnswers(initialAnswers);
-        console.log(
-          `[PRELOADED-CHECK] Initialized ${initialAnswers.length} user answers for pre-loaded questions`
-        );
+        // console.log(
+        //   `[PRELOADED-CHECK] Initialized ${initialAnswers.length} user answers for pre-loaded questions`
+        // );
       }
     } else if (
       quiz?.questions?.length === 0 &&
@@ -224,9 +225,9 @@ export default function QuizClient({ code }: ClientProps) {
       selectedDifficulty
     ) {
       // This case handles when we have a selected difficulty but no questions
-      console.log(
-        `[PRELOADED-CHECK] Selected difficulty ${selectedDifficulty} but no questions available`
-      );
+      // console.log(
+      //   `[PRELOADED-CHECK] Selected difficulty ${selectedDifficulty} but no questions available`
+      // );
       // We may need to auto-load if not already trying to load
       console.log(`[PRELOADED-CHECK] Auto-load trigger check:`, {
         difficultySelected,
@@ -256,9 +257,9 @@ export default function QuizClient({ code }: ClientProps) {
 
       try {
         // Get questions for the selected difficulty
-        console.log(
-          `Loading ${difficulty} difficulty questions for quiz ${quiz.id}`
-        );
+        // console.log(
+        //   `Loading ${difficulty} difficulty questions for quiz ${quiz.id}`
+        // );
 
         // Track the current questions before we attempt to load new ones
         const existingQuestions = quiz.questions || [];
@@ -278,9 +279,9 @@ export default function QuizClient({ code }: ClientProps) {
 
           // If the quiz already has questions loaded, we can use those
           if (existingQuestions.length > 0) {
-            console.log(
-              `Using ${existingQuestions.length} existing questions from the quiz`
-            );
+            // console.log(
+            //   `Using ${existingQuestions.length} existing questions from the quiz`
+            // );
             setDifficultySelected(true);
 
             // Just initialize user answers with the existing questions
@@ -309,9 +310,9 @@ export default function QuizClient({ code }: ClientProps) {
           return false; // No questions available
         }
 
-        console.log(
-          `Loaded ${questions.length} questions for ${difficulty} difficulty`
-        );
+        // console.log(
+        //   `Loaded ${questions.length} questions for ${difficulty} difficulty`
+        // );
 
         // Make sure the questions have valid IDs
         const validatedQuestions = questions.map((q, i) => {
@@ -387,13 +388,13 @@ export default function QuizClient({ code }: ClientProps) {
   // Single auto-load questions effect that runs when the quiz is loaded
   useEffect(() => {
     // Debug the current state
-    console.log(`[AUTO-LOAD-EFFECT] Checking auto-load conditions:`, {
-      quizId: quiz?.id,
-      selectedDifficulty,
-      difficultySelected,
-      isLoadingQuestions,
-      quizHasQuestions: (quiz?.questions && quiz.questions.length > 0) || false,
-    });
+    // console.log(`[AUTO-LOAD-EFFECT] Checking auto-load conditions:`, {
+    //   quizId: quiz?.id,
+    //   selectedDifficulty,
+    //   difficultySelected,
+    //   isLoadingQuestions,
+    //   quizHasQuestions: (quiz?.questions && quiz.questions.length > 0) || false,
+    // });
 
     // Skip if:
     // - Quiz data isn't loaded yet
@@ -406,23 +407,23 @@ export default function QuizClient({ code }: ClientProps) {
       difficultySelected ||
       isLoadingQuestions
     ) {
-      console.log(
-        `[AUTO-LOAD-EFFECT] Skipping auto-load due to conditions not met`
-      );
+      // console.log(
+      //   `[AUTO-LOAD-EFFECT] Skipping auto-load due to conditions not met`
+      // );
       return;
     }
 
-    console.log(
-      `[AUTO-LOAD-EFFECT] Auto-loading questions for ${selectedDifficulty} difficulty now that quiz is loaded`
-    );
+    // console.log(
+    //   `[AUTO-LOAD-EFFECT] Auto-loading questions for ${selectedDifficulty} difficulty now that quiz is loaded`
+    // );
 
     // Prevent other auto-loads by setting loading state
     setIsLoadingQuestions(true);
 
-    console.log(
-      `[AUTO-LOAD-EFFECT] memoizedLoadQuestions reference:`,
-      !!memoizedLoadQuestions.current
-    );
+    // console.log(
+    //   `[AUTO-LOAD-EFFECT] memoizedLoadQuestions reference:`,
+    //   !!memoizedLoadQuestions.current
+    // );
 
     // Use the autoLoadQuestionsForDifficulty utility function with loading state control
     autoLoadQuestionsForDifficulty(
@@ -467,7 +468,7 @@ export default function QuizClient({ code }: ClientProps) {
   }, [selectedDifficulty, quizStarted, quiz]);
 
   const handleDifficultySelect = async (difficulty: string) => {
-    console.log(`[MANUAL-SELECT] User selected ${difficulty} difficulty`);
+    // console.log(`[MANUAL-SELECT] User selected ${difficulty} difficulty`);
 
     if (difficulty === selectedDifficulty) {
       console.log(`Already on ${difficulty} difficulty, skipping update`);
@@ -483,7 +484,7 @@ export default function QuizClient({ code }: ClientProps) {
       const newDuration = quiz.difficultySettings?.[difficulty as keyof typeof quiz.difficultySettings]?.duration || 
         quiz.duration || 30; // Fallback to base duration, or 30 minutes as last resort
       
-      console.log(`Resetting timer for ${difficulty} difficulty: ${newDuration} minutes`);
+      // console.log(`Resetting timer for ${difficulty} difficulty: ${newDuration} minutes`);
       
       // Convert minutes to seconds for the timer
       const newTimeRemaining = newDuration * 60;
@@ -495,23 +496,23 @@ export default function QuizClient({ code }: ClientProps) {
 
     try {
       // Load questions for the selected difficulty
-      console.log(
-        `[MANUAL-SELECT] Manually loading questions for ${difficulty} difficulty`
-      );
+      // console.log(
+      //   `[MANUAL-SELECT] Manually loading questions for ${difficulty} difficulty`
+      // );
       const success = await loadQuestionsForDifficulty(difficulty);
 
       if (success) {
-        console.log(
-          `[MANUAL-SELECT] Setting difficultySelected to true for ${difficulty}`
-        );
+        // console.log(
+        //   `[MANUAL-SELECT] Setting difficultySelected to true for ${difficulty}`
+        // );
         setDifficultySelected(true); // Mark difficulty as selected after loading questions
-        console.log(
-          `[MANUAL-SELECT] Successfully loaded questions for ${difficulty} difficulty`
-        );
+        // console.log(
+        //   `[MANUAL-SELECT] Successfully loaded questions for ${difficulty} difficulty`
+        // );
       } else {
-        console.warn(
-          `[MANUAL-SELECT] Failed to load questions for ${difficulty} difficulty`
-        );
+        // console.warn(
+        //   `[MANUAL-SELECT] Failed to load questions for ${difficulty} difficulty`
+        // );
       }
     } catch (error) {
       console.error(
@@ -520,7 +521,7 @@ export default function QuizClient({ code }: ClientProps) {
       );
     } finally {
       // Always make sure loading state is reset
-      console.log(`[MANUAL-SELECT] Resetting loading state`);
+      // console.log(`[MANUAL-SELECT] Resetting loading state`);
       setIsLoadingQuestions(false);
     }
   };
@@ -552,7 +553,7 @@ export default function QuizClient({ code }: ClientProps) {
       const duration = quiz.difficultySettings?.[selectedDifficulty as keyof typeof quiz.difficultySettings]?.duration || 
         quiz.duration || 30; // Fallback to base duration, or 30 minutes as last resort
       
-      console.log(`Starting quiz with ${selectedDifficulty} difficulty: ${duration} minutes`);
+      // console.log(`Starting quiz with ${selectedDifficulty} difficulty: ${duration} minutes`);
       // Convert minutes to seconds for the timer
       setTimeRemaining(duration * 60);
     }
@@ -612,8 +613,8 @@ export default function QuizClient({ code }: ClientProps) {
       setIsSubmitting(true);
 
       // Ensure user answers and questions are aligned
-      console.log(`Quiz has ${quiz.questions.length} questions`);
-      console.log(`User has submitted ${userAnswers.length} answers`);
+      // console.log(`Quiz has ${quiz.questions.length} questions`);
+      // console.log(`User has submitted ${userAnswers.length} answers`);
 
       // Validate that we have answers for each question
       if (userAnswers.length !== quiz.questions.length) {
@@ -638,9 +639,9 @@ export default function QuizClient({ code }: ClientProps) {
           };
         });
 
-        console.log(
-          `Repaired answers: now have ${repairedAnswers.length} answers`
-        );
+        // console.log(
+        //   `Repaired answers: now have ${repairedAnswers.length} answers`
+        // );
         setUserAnswers(repairedAnswers);
       }
 
@@ -676,9 +677,9 @@ export default function QuizClient({ code }: ClientProps) {
         quiz,
         selectedDifficulty
       );
-      console.log(
-        `Using ${selectedDifficulty} difficulty multiplier: ${pointsMultiplier}x`
-      );
+      // console.log(
+      //   `Using ${selectedDifficulty} difficulty multiplier: ${pointsMultiplier}x`
+      // );
 
       // Calculate raw score - use max of questions length or answers length to avoid division by zero
       const denominator = Math.max(1, quiz.questions.length); // Prevent division by zero
@@ -690,24 +691,24 @@ export default function QuizClient({ code }: ClientProps) {
         Math.round(rawScore * pointsMultiplier)
       );
 
-      console.log(
-        `Raw score: ${correctAnswers}/${denominator} = ${rawScore}%, After multiplier: ${calculatedScore}%`
-      );
+      // console.log(
+      //   `Raw score: ${correctAnswers}/${denominator} = ${rawScore}%, After multiplier: ${calculatedScore}%`
+      // );
 
       // Log each answer for debugging
-      console.log("User answers for score calculation:");
-      userAnswers.forEach((answer, index) => {
-        const question = quiz.questions?.find(
-          (q) => q.id === answer.questionId
-        );
-        console.log(
-          `Q${index + 1} [${answer.questionId}]: Selected=${
-            answer.selectedOptionIndex
-          }, Correct=${question?.correctIndex}, IsMatch=${
-            answer.selectedOptionIndex === question?.correctIndex ? "✓" : "✗"
-          }`
-        );
-      });
+      // console.log("User answers for score calculation:");
+      // userAnswers.forEach((answer, index) => {
+      //   const question = quiz.questions?.find(
+      //     (q) => q.id === answer.questionId
+      //   );
+      //   console.log(
+      //     `Q${index + 1} [${answer.questionId}]: Selected=${
+      //       answer.selectedOptionIndex
+      //     }, Correct=${question?.correctIndex}, IsMatch=${
+      //       answer.selectedOptionIndex === question?.correctIndex ? "✓" : "✗"
+      //     }`
+      //   );
+      // });
 
       // Mark that we've calculated a score
       scoreCalculatedRef.current = true;
@@ -717,7 +718,7 @@ export default function QuizClient({ code }: ClientProps) {
       // Also save to localStorage as a reliable backup
       try {
         localStorage.setItem(`quiz_score_${quiz.id}`, String(calculatedScore));
-        console.log("Score saved to localStorage as backup:", calculatedScore);
+        // console.log("Score saved to localStorage as backup:", calculatedScore);
       } catch (e) {
         console.warn("Failed to save score to localStorage", e);
       }
@@ -725,40 +726,40 @@ export default function QuizClient({ code }: ClientProps) {
       // FIXED: Simplified score update to prevent "Too many re-renders" error
       // Update the score just once directly to avoid multiple state updates
       try {
-        console.log("Setting calculated score in state:", calculatedScore);
+        // console.log("Setting calculated score in state:", calculatedScore);
         setScore(calculatedScore);
       } catch (err) {
         console.error("Error setting score in state:", err);
-        console.log("Score preserved in ref:", lastCalculatedScoreRef.current);
+        // console.log("Score preserved in ref:", lastCalculatedScoreRef.current);
       }
 
       // Set up a single backup update with setTimeout 
       // This is non-recursive and won't create render loops
       setTimeout(() => {
-        console.log("Performing backup score update check after 300ms");
+        // console.log("Performing backup score update check after 300ms");
         // Important: Don't check the score state here as it would capture stale values
         // Instead, unconditionally set from our ref which has the most up-to-date value
         setScore(lastCalculatedScoreRef.current);
       }, 300);
 
       // Debug: Log the score state and ref after setting to confirm values
-      setTimeout(() => {
-        console.log("Debug - Score state after setting:", score);
-        console.log(
-          "Debug - Score ref after setting:",
-          lastCalculatedScoreRef.current
-        );
-        console.log(
-          "Debug - Score calculated flag:",
-          scoreCalculatedRef.current
-        );
-      }, 0);
+      // setTimeout(() => {
+      //   console.log("Debug - Score state after setting:", score);
+      //   console.log(
+      //     "Debug - Score ref after setting:",
+      //     lastCalculatedScoreRef.current
+      //   );
+      //   console.log(
+      //     "Debug - Score calculated flag:",
+      //     scoreCalculatedRef.current
+      //   );
+      // }, 0);
 
       // Try to submit to Firebase
       try {
-        console.log(
-          `Submitting quiz ${quiz.id} with ${userAnswers.length} answers and ${quiz.questions.length} questions`
-        );
+        // console.log(
+        //   `Submitting quiz ${quiz.id} with ${userAnswers.length} answers and ${quiz.questions.length} questions`
+        // );
 
         // Final validation of user answers
         const validatedAnswers = userAnswers.filter((answer) => {
@@ -781,9 +782,9 @@ export default function QuizClient({ code }: ClientProps) {
           return hasMatchingQuestion;
         });
 
-        console.log(
-          `After validation: submitting ${validatedAnswers.length} answers`
-        );
+        // console.log(
+        //   `After validation: submitting ${validatedAnswers.length} answers`
+        // );
 
         // Store the quiz questions directly in local storage as a backup
         try {
@@ -791,17 +792,17 @@ export default function QuizClient({ code }: ClientProps) {
             `quiz_questions_${quiz.id}`,
             JSON.stringify(quiz.questions)
           );
-          console.log("Quiz questions saved to localStorage as backup");
+          // console.log("Quiz questions saved to localStorage as backup");
         } catch (e) {
           console.warn("Failed to save questions to localStorage", e);
         }
 
         // CRITICAL FIX: Verify we have a score to display before submission
         if (score === null && lastCalculatedScoreRef.current !== null) {
-          console.log(
-            "Restoring score from ref before submission:",
-            lastCalculatedScoreRef.current
-          );
+          // console.log(
+          //   "Restoring score from ref before submission:",
+          //   lastCalculatedScoreRef.current
+          // );
           setScore(lastCalculatedScoreRef.current);
         }
 
@@ -820,14 +821,14 @@ export default function QuizClient({ code }: ClientProps) {
             response;
 
           setResponseId(backendResponseId);
-          console.log(
-            `Quiz response submitted successfully with ID: ${backendResponseId} and score: ${backendScore}`
-          );
+          // console.log(
+          //   `Quiz response submitted successfully with ID: ${backendResponseId} and score: ${backendScore}`
+          // );
 
           // FIXED: Trust the backend calculation instead of hardcoding 100%
-          console.log(
-            "Quiz submitted successfully - trusting backend score calculation"
-          );
+          // console.log(
+          //   "Quiz submitted successfully - trusting backend score calculation"
+          // );
 
           // Update the score with the actual backend calculation
           lastCalculatedScoreRef.current = backendScore;
@@ -848,14 +849,14 @@ export default function QuizClient({ code }: ClientProps) {
 
           try {
             localStorage.setItem(`quiz_score_${quiz.id}`, String(backendScore));
-            console.log("Score saved to localStorage:", backendScore);
+            // console.log("Score saved to localStorage:", backendScore);
           } catch (e) {
             console.warn("Failed to save score to localStorage", e);
           }
           
           // Then handle the state update (which can trigger re-renders)
           // We'll do this ONCE directly, and then set up non-recursive retries with delays
-          console.log(`Setting score from server calculation: ${backendScore}%`);
+          // console.log(`Setting score from server calculation: ${backendScore}%`);
           setScore(backendScore);
           
           // Set up a few delayed verification checks that won't cause recursive updates
@@ -865,7 +866,7 @@ export default function QuizClient({ code }: ClientProps) {
             setTimeout(() => {
               // Don't read the score state here (would cause closure issues)
               // Just do an unconditional update from our ref if needed
-              console.log(`Delayed score verification ${index + 1}/${delayedChecks.length}`);
+              // console.log(`Delayed score verification ${index + 1}/${delayedChecks.length}`);
               
               // The important part: we're not checking the state or creating recursion
               // We're just ensuring the state matches our ref at specific intervals
@@ -911,16 +912,16 @@ export default function QuizClient({ code }: ClientProps) {
             "quizResponses",
             JSON.stringify(existingResponses)
           );
-          console.log("Quiz response saved locally with ID", localResponseId);
+          // console.log("Quiz response saved locally with ID", localResponseId);
         } catch (e) {
           console.error("Error saving quiz response locally:", e);
         }
       }
       // Show error but still allow viewing results
-      console.log(
-        "DEBUG - Setting quizSubmitted to true after error, score:",
-        score
-      );
+      // console.log(
+      //   "DEBUG - Setting quizSubmitted to true after error, score:",
+      //   score
+      // );
       setQuizSubmitted(true);
     } finally {
       setIsSubmitting(false);
@@ -984,13 +985,13 @@ export default function QuizClient({ code }: ClientProps) {
         };
       });
 
-      console.log(
-        "Detailed answer check:",
-        JSON.stringify(answerDetails, null, 2)
-      );
-      console.log(
-        `Correct answer count calculated from answers: ${correctAnswersCount} out of ${userAnswers.length}`
-      );
+      // console.log(
+      //   "Detailed answer check:",
+      //   JSON.stringify(answerDetails, null, 2)
+      // );
+      // console.log(
+      //   `Correct answer count calculated from answers: ${correctAnswersCount} out of ${userAnswers.length}`
+      // );
 
       // Second attempt: Calculate the correct answer count based on the backend score or most reliable score source
       let reliableScore = null;
@@ -1020,9 +1021,9 @@ export default function QuizClient({ code }: ClientProps) {
         const calculatedCorrectCount = Math.round(
           (reliableScore / 100) * quiz.questions.length
         );
-        console.log(
-          `Using reliable score ${reliableScore}% to calculate correct answers: ${calculatedCorrectCount} out of ${quiz.questions.length}`
-        );
+        // console.log(
+        //   `Using reliable score ${reliableScore}% to calculate correct answers: ${calculatedCorrectCount} out of ${quiz.questions.length}`
+        // );
         
         // Only override if the calculated count seems more accurate
         if (calculatedCorrectCount > correctAnswersCount || calculatedCorrectCount > 0) {
@@ -1047,19 +1048,19 @@ export default function QuizClient({ code }: ClientProps) {
       }
 
       // Comprehensive logging for debugging
-      console.log("Rendering results - final score determination:", {
-        scoreState: score,
-        scoreRef: lastCalculatedScoreRef.current,
-        calculatedFlag: scoreCalculatedRef.current,
-        correctAnswers: correctAnswersCount,
-        totalQuestions: quiz.questions?.length || 0,
-        finalDisplayScore: displayScore
-      });
-      console.log("Rendering results - correct answers:", correctAnswersCount);
-      console.log(
-        "Rendering results - total questions:",
-        quiz.questions?.length || 0
-      );
+      // console.log("Rendering results - final score determination:", {
+      //   scoreState: score,
+      //   scoreRef: lastCalculatedScoreRef.current,
+      //   calculatedFlag: scoreCalculatedRef.current,
+      //   correctAnswers: correctAnswersCount,
+      //   totalQuestions: quiz.questions?.length || 0,
+      //   finalDisplayScore: displayScore
+      // });
+      // console.log("Rendering results - correct answers:", correctAnswersCount);
+      // console.log(
+      //   "Rendering results - total questions:",
+      //   quiz.questions?.length || 0
+      // );
 
       // Check if we should explicitly correct the score based on server calculation
       // Fix for when we have a responseId but the score isn't showing properly
@@ -1068,9 +1069,9 @@ export default function QuizClient({ code }: ClientProps) {
         (score === 0 || score === null) &&
         lastCalculatedScoreRef.current !== null
       ) {
-        console.log(
-          `FIXED: Score mismatch detected - using backend score: ${lastCalculatedScoreRef.current}%`
-        );
+        // console.log(
+        //   `FIXED: Score mismatch detected - using backend score: ${lastCalculatedScoreRef.current}%`
+        // );
         displayScore = lastCalculatedScoreRef.current;
 
         // Use both immediate and delayed score setting to overcome React state update issues
@@ -1098,7 +1099,7 @@ export default function QuizClient({ code }: ClientProps) {
         // First try: Use the ref value if available
         if (lastCalculatedScoreRef.current !== null) {
           displayScore = lastCalculatedScoreRef.current;
-          console.log("Using score from ref:", displayScore);
+          // console.log("Using score from ref:", displayScore);
         }
         // Second try: Check if we flagged a score calculation
         else if (
@@ -1106,9 +1107,9 @@ export default function QuizClient({ code }: ClientProps) {
           quiz.questions &&
           quiz.questions.length > 0
         ) {
-          console.log(
-            "Recalculating score due to scoreCalculated flag being true"
-          );
+          // console.log(
+          //   "Recalculating score due to scoreCalculated flag being true"
+          // );
           const pointsMultiplier = getDifficultyMultiplier(
             quiz,
             selectedDifficulty
@@ -1120,7 +1121,7 @@ export default function QuizClient({ code }: ClientProps) {
               (correctAnswersCount / denominator) * 100 * pointsMultiplier
             )
           );
-          console.log("Recalculated score:", recalculatedScore);
+          // console.log("Recalculated score:", recalculatedScore);
 
           // Update both state and ref
           displayScore = recalculatedScore;
@@ -1135,7 +1136,7 @@ export default function QuizClient({ code }: ClientProps) {
         }
         // Third try: Recalculate if we have enough data
         else if (quiz.questions && quiz.questions.length > 0) {
-          console.log("Forced recalculation of score");
+          // console.log("Forced recalculation of score");
           const pointsMultiplier = getDifficultyMultiplier(
             quiz,
             selectedDifficulty
@@ -1147,7 +1148,7 @@ export default function QuizClient({ code }: ClientProps) {
               (correctAnswersCount / denominator) * 100 * pointsMultiplier
             )
           );
-          console.log("Forced recalculated score:", recalculatedScore);
+          // console.log("Forced recalculated score:", recalculatedScore);
 
           // Update both state and ref
           displayScore = recalculatedScore;
