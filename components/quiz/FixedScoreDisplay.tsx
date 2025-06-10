@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /**
  * Enhanced component to display quiz scores with multiple fallback mechanisms.
  * This version uses a more robust algorithm to ensure the score is always displayed,
@@ -40,29 +41,24 @@ export function FixedScoreDisplay({
     let shouldBeCalculating = false;
     
     // Decision tree for score determination (only one outcome)
-    if (displayScore !== null && displayScore > 0) {
-      // First priority: Use displayScore if it's valid
+    if (displayScore !== null && displayScore >= 0) {
+      // First priority: Use displayScore if it's valid (including zero)
       console.log("FixedScoreDisplay: Using display score:", displayScore);
       finalScore = `${displayScore}%`;
       shouldBeCalculating = false;
-    } else if (lastCalculatedScoreRef.current !== null && lastCalculatedScoreRef.current > 0) {
-      // Second priority: Use ref score if available
+    } else if (lastCalculatedScoreRef.current !== null && lastCalculatedScoreRef.current >= 0) {
+      // Second priority: Use ref score if available (including zero)
       console.log("FixedScoreDisplay: Using ref score:", lastCalculatedScoreRef.current);
       finalScore = `${lastCalculatedScoreRef.current}%`;
       shouldBeCalculating = false;
-    } else if (displayScore === 0 && lastCalculatedScoreRef.current === 0) {
-      // Third priority: If both are exactly zero
-      console.log("FixedScoreDisplay: Both scores are zero, displaying 0%");
-      finalScore = '0%';
-      shouldBeCalculating = false;
     } else {
-      // Fourth case: Still calculating
+      // Third case: Still calculating
       console.log("FixedScoreDisplay: No stable score yet, showing Calculating...");
       finalScore = 'Calculating...';
       shouldBeCalculating = true;
       
       // Only set up polling if we're still calculating and haven't exceeded max attempts
-      if (scoreCheckAttemptsRef.current < 5) { // Reduced from 10 to 5 attempts
+      if (scoreCheckAttemptsRef.current < 5) { // Maximum of 5 attempts
         scoreCheckAttemptsRef.current += 1;
         
         // Set up a single non-recursive timeout for the next check
@@ -71,27 +67,31 @@ export function FixedScoreDisplay({
           
           // Check if score has been updated in ref during the wait
           const currentRefScore = lastCalculatedScoreRef.current;
-          if (currentRefScore !== null && currentRefScore > 0) {
+          if (currentRefScore !== null && currentRefScore >= 0) {
             console.log("FixedScoreDisplay: Found score in ref during retry:", currentRefScore);
             setStableScore(`${currentRefScore}%`);
             setIsCalculating(false);
           } else if (scoreCheckAttemptsRef.current >= 5) {
-            // After max retries, default to 0% or whatever we have
-            const finalDefaultScore = currentRefScore !== null ? `${currentRefScore}%` : '0%';
-            console.log(`FixedScoreDisplay: Max retries reached, using ${finalDefaultScore}`);
-            setStableScore(finalDefaultScore);
+            // After max retries, default to 0%
+            console.log("FixedScoreDisplay: Max retries reached, using 0%");
+            setStableScore('0%');
             setIsCalculating(false);
           }
         }, 500);
       }
     }
     
-    // Update the state all at once with our decision
-    if (finalScore !== null && (finalScore !== stableScore || shouldBeCalculating !== isCalculating)) {
+    // CRITICAL FIX: Only update state if we have a new value that's different
+    // This prevents infinite re-render loops when dealing with zero scores
+    if (finalScore !== null && finalScore !== stableScore) {
       setStableScore(finalScore);
+    }
+    
+    // Separate state update for calculating flag to prevent coupling
+    if (shouldBeCalculating !== isCalculating) {
       setIsCalculating(shouldBeCalculating);
     }
-  }, [displayScore, lastCalculatedScoreRef, stableScore, isCalculating]);
+  }, [displayScore, lastCalculatedScoreRef]);
   
   // Ensure animation while calculating
   if (isCalculating) {

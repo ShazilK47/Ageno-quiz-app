@@ -943,17 +943,18 @@ export default function QuizClient({ code }: ClientProps) {
       //   lastCalculatedScoreRef.current
       // );
 
-      // CRITICAL: Check for score = 0 but successful submission (indicates mismatch)
-      if ((score === 0 || score === null) && responseId) {
+      // CRITICAL: Check for score = null but successful submission (indicates mismatch)
+      // Note: We're now allowing score = 0 as a valid score
+      if (score === null && responseId) {
         console.warn(
-          "Score inconsistency detected - server successfully processed quiz but score is 0"
+          "Score inconsistency detected - server successfully processed quiz but score is null"
         );
         // Try to recover from localStorage if we stored it there as a backup
         try {
           const storedScore = localStorage.getItem(`quiz_score_${quiz.id}`);
           if (storedScore) {
             const parsedScore = parseInt(storedScore, 10);
-            if (!isNaN(parsedScore) && parsedScore > 0) {
+            if (!isNaN(parsedScore)) {
               console.log(`Recovered score from localStorage: ${parsedScore}%`);
               setScore(parsedScore);
               lastCalculatedScoreRef.current = parsedScore;
@@ -1063,10 +1064,10 @@ export default function QuizClient({ code }: ClientProps) {
       // );
 
       // Check if we should explicitly correct the score based on server calculation
-      // Fix for when we have a responseId but the score isn't showing properly
+      // Fix for when we have a responseId but the score is null
       if (
         responseId &&
-        (score === 0 || score === null) &&
+        score === null &&
         lastCalculatedScoreRef.current !== null
       ) {
         // console.log(
@@ -1074,7 +1075,7 @@ export default function QuizClient({ code }: ClientProps) {
         // );
         displayScore = lastCalculatedScoreRef.current;
 
-        // Use both immediate and delayed score setting to overcome React state update issues
+        // Use score setting once to avoid re-render issues
         setScore(lastCalculatedScoreRef.current);
 
         // Recalculate correct answers based on the score percentage
@@ -1082,20 +1083,10 @@ export default function QuizClient({ code }: ClientProps) {
           (lastCalculatedScoreRef.current / 100) * quiz.questions.length
         );
         correctAnswersCount = calculatedCorrectCount;
-
-        // Extra insurance with timeout for delayed state update
-        setTimeout(() => {
-          if (score === 0 || score === null) {
-            console.log(
-              `Applying delayed score update from server calculation: ${lastCalculatedScoreRef.current}%`
-            );
-            setScore(lastCalculatedScoreRef.current);
-          }
-        }, 100);
       }
 
       // Comprehensive approach to ensure we display the correct score
-      if (score === null || score === 0) {
+      if (score === null) { // Only trigger recalculation if score is null, not if it's 0
         // First try: Use the ref value if available
         if (lastCalculatedScoreRef.current !== null) {
           displayScore = lastCalculatedScoreRef.current;
@@ -1123,16 +1114,12 @@ export default function QuizClient({ code }: ClientProps) {
           );
           // console.log("Recalculated score:", recalculatedScore);
 
-          // Update both state and ref
+          // Update both display and ref values without triggering excessive re-renders
           displayScore = recalculatedScore;
           lastCalculatedScoreRef.current = recalculatedScore;
 
-          // Update the state if possible
-          try {
-            setScore(recalculatedScore);
-          } catch (err) {
-            console.error("Error setting recalculated score:", err);
-          }
+          // Use a single update to avoid re-render cycles
+          setScore(recalculatedScore);
         }
         // Third try: Recalculate if we have enough data
         else if (quiz.questions && quiz.questions.length > 0) {
@@ -1150,20 +1137,18 @@ export default function QuizClient({ code }: ClientProps) {
           );
           // console.log("Forced recalculated score:", recalculatedScore);
 
-          // Update both state and ref
+          // Update display and ref values
           displayScore = recalculatedScore;
           lastCalculatedScoreRef.current = recalculatedScore;
           scoreCalculatedRef.current = true;
 
-          // Update the state if possible
-          try {
-            setScore(recalculatedScore);
-          } catch (err) {
-            console.error("Error setting forced recalculated score:", err);
-          }
+          // Use a single update to avoid re-render cycles
+          setScore(recalculatedScore);
         } else {
           console.warn("Unable to calculate score, all attempts failed");
-          displayScore = 0;
+          displayScore = 0; // Default to 0 as a valid score
+          lastCalculatedScoreRef.current = 0;
+          setScore(0); // Update the score state to prevent future recalculations
         }
       }
 
